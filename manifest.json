@@ -1,0 +1,9 @@
+{
+  "name": "Açaí do Bom",
+  "short_name": "Açaí do Bom",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fffaf2",
+  "theme_color": "#5b1779",
+  "icons": []
+}

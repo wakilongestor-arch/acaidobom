@@ -1,0 +1,50 @@
+[
+  {
+    "id": "destaques",
+    "name": "Destaques",
+    "emoji": "✨",
+    "active": true
+  },
+  {
+    "id": "acai",
+    "name": "Açaí",
+    "emoji": "🥣",
+    "active": true
+  },
+  {
+    "id": "combos",
+    "name": "Combos",
+    "emoji": "💜",
+    "active": true
+  },
+  {
+    "id": "lanches",
+    "name": "Lanches",
+    "emoji": "🍔",
+    "active": true
+  },
+  {
+    "id": "pasteis",
+    "name": "Pastéis",
+    "emoji": "🥟",
+    "active": true
+  },
+  {
+    "id": "marmitas",
+    "name": "Marmitas",
+    "emoji": "🍱",
+    "active": true
+  },
+  {
+    "id": "bebidas",
+    "name": "Bebidas",
+    "emoji": "🥤",
+    "active": true
+  },
+  {
+    "id": "porcoes",
+    "name": "Porções",
+    "emoji": "🍟",
+    "active": true
+  }
+]

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Açaí do Bom | Cardápio e Delivery em Ji-Paraná</title>
+  <meta name="description" content="Monte seu açaí do seu jeito e peça com delivery próprio em Ji-Paraná, Rondônia.">
+  <meta name="theme-color" content="#5b1779">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/theme-custom.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#inicio"><span class="brand-mark">A</span><span><b data-store-name>Açaí do Bom</b><small>DELIVERY PRÓPRIO</small></span></a>
+    <nav><a href="#cardapio">Cardápio</a><a href="#entrega">Entrega</a><a id="nav-whatsapp" target="_blank" rel="noopener">Contato</a></nav>
+    <button class="cart-toggle" type="button" data-open-cart aria-label="Abrir pedido">🛍 <span>Meu pedido</span><b data-cart-count>0</b></button>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio">
+      <img id="hero-image" alt="Açaí cremoso com frutas e granola">
+      <div class="hero-shade"></div>
+      <div class="hero-copy">
+        <p>✦ DO SEU JEITO</p>
+        <h1>O açaí que<br><em>dá vontade.</em></h1>
+        <span id="store-tagline">Seu açaí do seu jeito, rápido e caprichado</span>
+        <div><a class="cta" href="#cardapio">VER CARDÁPIO →</a><span class="open-status" id="store-status">● Aberto agora</span></div>
+      </div>
+    </section>
+
+    <section class="info-strip" id="entrega">
+      <article><i>📍</i><span><small>ATENDIMENTO</small><b id="store-city">Ji-Paraná - RO</b></span></article>
+      <article><i>◷</i><span><small>TEMPO ESTIMADO</small><b id="store-time">35–50 min</b></span></article>
+      <article><i>🛵</i><span><small>TAXA A PARTIR DE</small><b id="store-fee">R$ 7,00</b></span></article>
+      <article><i>💳</i><span><small>PAGAMENTO</small><b>PIX cartão ou dinheiro</b></span></article>
+    </section>
+
+    <section class="menu-section" id="cardapio">
+      <header class="section-title"><div><small>ESCOLHA O SEU</small><h2>Cardápio</h2></div><label class="search">⌕<input id="search" type="search" placeholder="Buscar no cardápio"></label></header>
+      <div class="categories" id="categories" role="tablist"></div>
+      <div class="products" id="products"></div>
+    </section>
+
+    <section class="whatsapp-callout"><div><i>◉</i><span><small>PREFERE PEDIR DIRETO?</small><b>Fale com a gente no WhatsApp</b></span></div><a id="callout-whatsapp" target="_blank" rel="noopener">CHAMAR AGORA →</a></section>
+  </main>
+
+  <footer class="footer"><div class="brand"><span class="brand-mark">A</span><span><b data-store-name>Açaí do Bom</b><small>FEITO COM CAPRICHO</small></span></div><p id="store-address">Ji-Paraná Rondônia</p><div><a href="sistema/admin/">Painel administrativo</a><span>© 2026 Açaí do Bom</span></div></footer>
+
+  <div class="overlay" id="product-overlay" hidden>
+    <section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-name">
+      <button class="modal-close" data-close-product aria-label="Fechar">×</button>
+      <div class="product-modal-head"><img id="product-image" alt=""><div><h2 id="product-name"></h2><p id="product-description"></p><b id="product-base-price"></b></div></div>
+      <div class="addon-list" id="addon-list"></div>
+      <label class="field notes"><span>Alguma observação?</span><textarea id="item-notes" placeholder="Ex: separar granola sem leite condensado"></textarea></label>
+      <p class="error" id="product-error" hidden></p>
+      <footer class="modal-footer"><div class="quantity"><button type="button" data-qty-minus>−</button><b id="item-quantity">1</b><button type="button" data-qty-plus>+</button></div><button class="primary" id="add-to-cart">Adicionar · R$ 0,00</button></footer>
+    </section>
+  </div>
+
+  <aside class="cart" id="cart" aria-hidden="true">
+    <header><div><h2>Seu pedido</h2><p>Confira os itens antes de finalizar</p></div><button data-close-cart aria-label="Fechar">×</button></header>
+    <div class="cart-items" id="cart-items"></div>
+    <footer id="cart-footer"><div><span>Subtotal</span><b id="cart-subtotal">R$ 0,00</b></div><small id="minimum-order"></small><button class="primary" id="start-checkout">Finalizar pedido →</button></footer>
+  </aside>
+  <div class="backdrop" id="cart-backdrop" hidden></div>
+
+  <div class="overlay" id="checkout-overlay" hidden>
+    <section class="modal checkout-modal" role="dialog" aria-modal="true">
+      <button class="modal-close" id="close-checkout" aria-label="Fechar">×</button>
+      <header class="checkout-head"><button id="checkout-back" aria-label="Voltar">←</button><div><h2>Finalizar pedido</h2><p id="checkout-step-label">Etapa 1 de 3</p></div><span><i id="checkout-progress"></i></span></header>
+      <form id="checkout-form">
+        <div class="checkout-step" data-step="1">
+          <div class="form-grid"><label class="field full"><span>Seu nome *</span><input name="name" required></label><label class="field"><span>WhatsApp *</span><input name="phone" inputmode="tel" required placeholder="(69) 99999-9999"></label><label class="field"><span>E-mail</span><input name="email" type="email"></label></div>
+        </div>
+        <div class="checkout-step" data-step="2" hidden>
+          <div class="fulfillment"><label><input type="radio" name="fulfillment" value="delivery" checked><span>🛵 <b>Receber em casa</b><small>Com taxa de entrega</small></span></label><label><input type="radio" name="fulfillment" value="pickup"><span>🏪 <b>Retirar no local</b><small>Sem taxa de entrega</small></span></label></div>
+          <div class="form-grid" id="address-fields"><label class="field"><span>CEP</span><input name="zip"></label><label class="field"><span>Cidade *</span><input name="city" value="Ji-Paraná - RO"></label><label class="field full"><span>Rua Avenida *</span><input name="street"></label><label class="field"><span>Número *</span><input name="number"></label><label class="field"><span>Complemento</span><input name="complement"></label><label class="field"><span>Bairro *</span><input name="neighborhood"></label><label class="field"><span>Referência</span><input name="reference"></label></div>
+        </div>
+        <div class="checkout-step" data-step="3" hidden>
+          <h3>Como deseja pagar?</h3><div class="payments" id="payment-options"></div>
+          <label class="field" id="change-field" hidden><span>Troco para quanto?</span><input name="changeFor" placeholder="Ex: R$ 100,00"></label>
+          <label class="field"><span>Observações gerais</span><textarea name="notes"></textarea></label>
+          <div class="summary" id="order-summary"></div>
+        </div>
+        <p class="error" id="checkout-error" hidden></p>
+        <footer><button class="primary" id="checkout-next" type="button">Continuar →</button><button class="primary" id="checkout-submit" type="submit" hidden>Confirmar pedido</button></footer>
+      </form>
+      <div class="success" id="order-success" hidden></div>
+    </section>
+  </div>
+
+  <button class="mobile-cart" data-open-cart hidden><span>🛍 <b data-cart-count>0</b></span><strong>Ver pedido</strong><em id="mobile-total">R$ 0,00</em></button>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/cart.js"></script>
+  <script src="assets/js/checkout.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
