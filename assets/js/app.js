@@ -329,29 +329,28 @@
       }).join('') + '</div>' + renderCartSuggestions(suggestions) :
       '<div class="empty"><span>🛍</span><h3>Seu carrinho está vazio</h3><p>Escolha seus favoritos no cardápio.</p></div>';
     bindImageFallbacks($('#cart-items'));
-    $('#cart-items').querySelectorAll('[data-remove]').forEach(button => {
-      button.onclick = () => CartStore.remove(button.dataset.remove);
-    });
-    $('#cart-items').querySelectorAll('[data-minus]').forEach(button => {
-      button.onclick = () => {
-        const item = items.find(current => current.cartId === button.dataset.minus);
-        if (item) CartStore.quantity(item.cartId, item.quantity - 1);
-      };
-    });
-    $('#cart-items').querySelectorAll('[data-plus]').forEach(button => {
-      button.onclick = () => {
-        const item = items.find(current => current.cartId === button.dataset.plus);
-        if (item) CartStore.quantity(item.cartId, item.quantity + 1);
-      };
-    });
-    $('#cart-items').querySelectorAll('[data-suggestion]').forEach(button => {
-      button.onclick = () => {
-        const productId = button.dataset.suggestion;
-        closeCart();
-        openProduct(productId, button);
-      };
-    });
     applyStoreStateToCheckout();
+  }
+
+  function handleCartClick(event) {
+    const button = event.target.closest('button');
+    if (!button || !$('#cart-items').contains(button)) return;
+    const items = CartStore.get();
+    if (button.dataset.remove) {
+      CartStore.remove(button.dataset.remove);
+      return;
+    }
+    if (button.dataset.minus || button.dataset.plus) {
+      const cartId = button.dataset.minus || button.dataset.plus;
+      const item = items.find(current => current.cartId === cartId);
+      if (item) CartStore.quantity(cartId, item.quantity + (button.dataset.plus ? 1 : -1));
+      return;
+    }
+    if (button.dataset.suggestion) {
+      const productId = button.dataset.suggestion;
+      closeCart();
+      openProduct(productId, button);
+    }
   }
 
   function getCartSuggestions(items) {
@@ -496,6 +495,7 @@
       renderProducts();
     });
     $$('[data-open-cart]').forEach(button => button.addEventListener('click', openCart));
+    $('#cart-items').addEventListener('click', handleCartClick);
     $('[data-close-cart]').addEventListener('click', closeCart);
     $('#cart-backdrop').addEventListener('click', closeCart);
     $$('[data-close-product]').forEach(button => button.addEventListener('click', () => closeProduct()));
