@@ -57,7 +57,14 @@
         <div class="dashboard-grid"><article class="card"><h3>Pedidos recentes</h3><div id="recent-orders"></div></article><article class="card operation"><h3>Operação</h3><div id="operation-summary"></div></article></div>
       </section>
 
-      <section class="tab" data-panel="orders"><div class="title row"><div><small>CONTROLE DA COZINHA</small><h2>Pedidos</h2></div><div class="order-toolbar"><button id="order-board-view" class="active">▦ CRM</button><button id="order-list-view">☷ Lista</button><button class="primary" id="refresh-orders">Atualizar</button></div></div><div class="orders orders-board" id="orders-list"></div></section>
+      <section class="tab" data-panel="orders">
+        <div class="title row"><div><small>CONTROLE DA COZINHA</small><h2>Pedidos</h2><p id="order-filter-summary"></p></div><div class="order-toolbar"><button id="order-board-view" class="active">▦ CRM</button><button id="order-list-view">☷ Lista</button><button class="primary" id="refresh-orders">Atualizar</button></div></div>
+        <div class="order-filters" aria-label="Filtros dos pedidos">
+          <label>Período<select id="order-period"><option value="today">Hoje</option><option value="yesterday">Ontem</option><option value="7days">Últimos 7 dias</option><option value="30days">Últimos 30 dias</option><option value="custom">Escolher data</option><option value="all">Todos</option></select></label>
+          <label id="order-date-field" hidden>Data<input type="date" id="order-date"></label>
+        </div>
+        <div class="orders orders-board" id="orders-list"></div>
+      </section>
       <section class="tab" data-panel="products"><div class="title row"><div><small>CATÁLOGO</small><h2>Produtos</h2><p id="product-count"></p></div><button class="primary" id="new-product">+ Novo produto</button></div><div class="product-list" id="admin-products"></div></section>
 
       <section class="tab" data-panel="appearance">
@@ -80,6 +87,7 @@
           <article class="card"><h3>Dados empresariais</h3><label>Nome do estabelecimento<input id="establishment-name"></label><label>Nome da localização<input id="location-name" placeholder="Ji-Paraná - RO"></label><label>CNPJ<input id="store-cnpj" placeholder="00.000.000/0000-00"></label><label>Telefone público<input id="contact-phone"></label><label>E-mail público<input id="public-email" type="email"></label></article>
           <article class="card"><h3>Redes sociais</h3><p>Os ícones aparecem no rodapé quando o link estiver preenchido.</p><label>Instagram<input id="instagram-url" type="url" placeholder="https://instagram.com/..."></label><label>Página do Facebook<input id="facebook-url" type="url" placeholder="https://facebook.com/..."></label><label>TikTok<input id="tiktok-url" type="url" placeholder="https://tiktok.com/@..."></label></article>
           <article class="card integration-card"><h3>WhatsApp Cloud API</h3><label class="switch-line"><span><b>Ativar envio pela API da Meta</b><small>O token fica protegido nos Secrets do Supabase.</small></span><input type="checkbox" id="whatsapp-cloud-enabled"></label><p>Função preparada: <code>whatsapp-order</code>. Nunca coloque o token dentro do painel.</p><a href="../../INTEGRACOES.md" target="_blank">Ver instruções de integração</a></article>
+          <article class="card integration-card make-card"><h3>E-mails automáticos · Make + Mailgun</h3><label class="switch-line"><span><b>Ativar automação de e-mail</b><small>O pedido vai ao e-mail da loja e o cliente recebe atualizações.</small></span><input type="checkbox" id="make-webhook-enabled"></label><label>Webhook personalizado do Make<input id="make-webhook-url" type="password" autocomplete="off" placeholder="https://hook...make.com/..."></label><div class="integration-actions"><button type="button" id="toggle-make-webhook">Mostrar URL</button><button type="button" id="test-make-webhook">Testar webhook</button></div><p id="make-webhook-status">O endereço é salvo em uma tabela privada do Supabase e não aparece no cardápio.</p><a href="../../INTEGRACOES.md#make-mailgun" target="_blank">Como montar o cenário no Make</a></article>
           <article class="card integration-card"><h3>Gateway e checkout</h3><label>Provedor<select id="gateway-provider"><option value="none">Nenhum</option><option value="custom">API personalizada</option><option value="mercadopago">Mercado Pago</option><option value="pagarme">Pagar.me</option><option value="stripe">Stripe</option></select></label><label class="switch-line"><span><b>Ativar checkout pela API</b><small>As credenciais ficam no Supabase.</small></span><input type="checkbox" id="gateway-enabled"></label><p>Função preparada: <code>create-checkout</code>.</p></article>
           <article class="card categories-card"><header class="card-row"><div><h3>Categorias</h3><p>Ideal: 1200 × 650 px, JPG ou WebP, até 2 MB. Mantenha o alimento centralizado.</p></div><button id="add-category">+ Adicionar</button></header><div id="category-editor"></div></article>
         </div>
@@ -95,6 +103,7 @@
     </div><footer><button type="button" data-close-product>Cancelar</button><button class="primary" id="save-product">Confirmar e publicar produto</button></footer></form>
   </div>
   <div class="confirm" id="confirm-delete" hidden><div><h3>Excluir produto?</h3><p>Ele será removido após publicar as alterações.</p><footer><button id="cancel-delete">Cancelar</button><button id="do-delete">Excluir</button></footer></div></div>
+  <div class="confirm" id="confirm-order-delete" hidden><div><h3>Excluir pedido?</h3><p id="order-delete-message">O pedido e o histórico de automações serão removidos definitivamente.</p><footer><button id="cancel-order-delete">Voltar</button><button id="do-order-delete">Excluir pedido</button></footer></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../../assets/js/supabase-config.js"></script>

@@ -4,12 +4,16 @@
   const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
   let catalog = { settings: {}, categories: [], products: [] };
+  let privateSettings = { makeWebhookEnabled: false, makeWebhookUrl: '', available: false };
   let orders = [];
   let editing = null;
   let deleting = null;
+  let deletingOrder = null;
   let orderRefreshTimer = null;
   let knownOrderIds = new Set();
   let orderView = 'board';
+  let orderPeriod = 'today';
+  let customOrderDate = '';
   const weekDays = [
     ['sun', 'Domingo'], ['mon', 'Segunda'], ['tue', 'Terça'], ['wed', 'Quarta'],
     ['thu', 'Quinta'], ['fri', 'Sexta'], ['sat', 'Sábado']
@@ -54,6 +58,7 @@
       catalog = await SupabaseStore.loadCatalog() || await loadFallbackCatalog();
       const migrated = ensureCatalogDefaults();
       if (migrated) await SupabaseStore.saveCatalog(catalog);
+      privateSettings = await SupabaseStore.loadPrivateSettings();
       orders = await SupabaseStore.listOrders();
       knownOrderIds = new Set(orders.map(order => String(order.id)));
       fill();
@@ -146,6 +151,13 @@
     $('#whatsapp-cloud-enabled').checked = Boolean(settings.whatsappCloudEnabled);
     $('#gateway-enabled').checked = Boolean(settings.gatewayEnabled);
     $('#store-status-mode').value = settings.statusMode || 'open';
+    $('#make-webhook-enabled').checked = Boolean(privateSettings.makeWebhookEnabled);
+    $('#make-webhook-url').value = privateSettings.makeWebhookUrl || '';
+    updateMakeWebhookStatus(privateSettings.available
+      ? 'Webhook protegido pronto para configuração.'
+      : 'Execute a migração 003 no Supabase para liberar esta integração.', !privateSettings.available);
+    customOrderDate = localDateKey(new Date());
+    $('#order-date').value = customOrderDate;
     renderHoursEditor();
     renderPreviews();
   }
@@ -173,7 +185,16 @@
     settings.brandBrightColor = '#620853';
     settings.whatsappCloudEnabled = $('#whatsapp-cloud-enabled').checked;
     settings.gatewayEnabled = $('#gateway-enabled').checked;
+    privateSettings.makeWebhookEnabled = $('#make-webhook-enabled').checked;
+    privateSettings.makeWebhookUrl = $('#make-webhook-url').value.trim();
     collectHours();
+  }
+
+  function updateMakeWebhookStatus(text, error = false) {
+    const element = $('#make-webhook-status');
+    if (!element) return;
+    element.textContent = text;
+    element.className = error ? 'error' : 'ok';
   }
 
   function renderHoursEditor() {
@@ -240,6 +261,43 @@
     if (element) element.textContent = statusPreview();
   }
 
+  function localDateKey(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.valueOf())) return '';
+    const parts = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: catalog.settings.timezone || 'America/Porto_Velho',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(date);
+    const get = type => parts.find(part => part.type === type)?.value || '';
+    return `${get('year')}-${get('month')}-${get('day')}`;
+  }
+
+  function shiftDateKey(key, days) {
+    const date = new Date(`${key}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function filteredOrders() {
+    if (orderPeriod === 'all') return orders;
+    const today = localDateKey(new Date());
+    const target = orderPeriod === 'yesterday' ? shiftDateKey(today, -1) : orderPeriod === 'custom' ? customOrderDate : today;
+    if (orderPeriod === 'today' || orderPeriod === 'yesterday' || orderPeriod === 'custom') {
+      return orders.filter(order => localDateKey(order.created_at || order.createdAt) === target);
+    }
+    const days = orderPeriod === '30days' ? 29 : 6;
+    const start = shiftDateKey(today, -days);
+    return orders.filter(order => {
+      const key = localDateKey(order.created_at || order.createdAt);
+      return key >= start && key <= today;
+    });
+  }
+
+  function orderPeriodLabel() {
+    return ({ today: 'hoje', yesterday: 'ontem', '7days': 'nos últimos 7 dias', '30days': 'nos últimos 30 dias', all: 'em todo o histórico' })[orderPeriod]
+      || (customOrderDate ? `em ${customOrderDate.split('-').reverse().join('/')}` : 'na data escolhida');
+  }
+
   function renderAll() {
     renderDashboard();
     renderOrders();
@@ -249,10 +307,10 @@
   }
 
   function renderDashboard() {
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = localDateKey(new Date());
     const todays = orders.filter(order => {
       const date = new Date(order.created_at || order.createdAt);
-      return !Number.isNaN(date.valueOf()) && date.toLocaleDateString('en-CA') === today;
+      return !Number.isNaN(date.valueOf()) && localDateKey(date) === today;
     });
     const pending = orders.filter(order => ['novo', 'confirmado', 'preparando', 'saiu_entrega'].includes(order.status));
     $('#stat-orders').textContent = todays.length;
@@ -313,13 +371,26 @@
     return lines.join('\n');
   }
 
+  function nextOrderAction(order) {
+    if (order.status === 'novo') return { status: 'confirmado', label: '✓ Confirmar pedido' };
+    if (order.status === 'confirmado') return { status: 'preparando', label: '▶ Iniciar preparo' };
+    if (order.status === 'preparando') return order.fulfillment === 'pickup'
+      ? { status: 'concluido', label: '✓ Finalizar retirada' }
+      : { status: 'saiu_entrega', label: '🛵 Saiu para entrega' };
+    if (order.status === 'saiu_entrega') return { status: 'concluido', label: '✓ Concluir pedido' };
+    return null;
+  }
+
   function renderOrders() {
     const box = $('#orders-list');
-    if (!orders.length) {
-      box.innerHTML = '<div class="card empty-admin">Nenhum pedido recebido.</div>';
+    const visibleOrders = filteredOrders();
+    $('#order-filter-summary').textContent = `${visibleOrders.length} pedido${visibleOrders.length === 1 ? '' : 's'} ${orderPeriodLabel()}`;
+    if (!visibleOrders.length) {
+      box.className = 'orders';
+      box.innerHTML = `<div class="card empty-admin order-filter-empty">Nenhum pedido encontrado ${esc(orderPeriodLabel())}.</div>`;
       return;
     }
-    box.innerHTML = orders.map(order => {
+    box.innerHTML = visibleOrders.map(order => {
       const items = Array.isArray(order.items) ? order.items : [];
       const customer = order.customer || {};
       const address = order.address || {};
@@ -337,13 +408,31 @@
         ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.reference ? `<br><b>Referência:</b> ${esc(address.reference)}` : ''}${mapUrl ? `<br><a class="map-link" href="${esc(mapUrl)}" target="_blank" rel="noopener">Abrir localização no mapa</a>` : ''}</div>`
         : '<div class="order-address"><b>🏪 Retirada no local</b><br>Cliente buscará o pedido na loja.</div>';
       const paymentClass = order.payment_status === 'pago' ? 'paid' : order.payment_status === 'estornado' ? 'refunded' : 'pending';
+      const nextAction = nextOrderAction(order);
+      const storeEmailStatus = order.store_email_status || 'nao_enviado';
+      const customerEmailStatus = order.customer_email_status || 'nao_enviado';
+      const emailClass = status => status === 'enviado' ? 'sent' : status === 'erro' ? 'error' : 'pending';
+      const storeEmailText = storeEmailStatus === 'enviado' ? 'Loja: nota enviada' : storeEmailStatus === 'erro' ? 'Loja: erro no envio' : 'Loja: nota pendente';
+      const customerEmailText = customerEmailStatus === 'enviado' ? 'Cliente: e-mail enviado' : customerEmailStatus === 'erro' ? 'Cliente: erro no envio' : 'Cliente: e-mail pendente';
+      const customerEmailEvent = ({ confirmado: 'confirmed', preparando: 'preparing', saiu_entrega: 'out_for_delivery', concluido: 'completed', cancelado: 'cancelled' })[order.status];
+      const retryStoreEmail = storeEmailStatus !== 'enviado'
+        ? `<button type="button" class="retry-email" data-email-event="created" data-order-id="${esc(order.id)}">✉ Enviar nota à loja</button>`
+        : '';
+      const retryCustomerEmail = customer.email && customerEmailEvent && customerEmailStatus !== 'enviado'
+        ? `<button type="button" class="retry-email" data-email-event="${esc(customerEmailEvent)}" data-order-id="${esc(order.id)}">✉ Reenviar ao cliente</button>`
+        : '';
+      const nextButton = nextAction ? `<button type="button" class="next-order" data-fast-status="${esc(nextAction.status)}" data-order-id="${esc(order.id)}">${esc(nextAction.label)}</button>` : '';
+      const cancelButton = !['concluido', 'cancelado'].includes(order.status) ? `<button type="button" class="cancel-order" data-fast-status="cancelado" data-order-id="${esc(order.id)}">Cancelar pedido</button>` : '';
+      const paymentButton = order.payment_status === 'pago'
+        ? `<button type="button" class="undo-paid" data-fast-payment="pendente" data-order-id="${esc(order.id)}">Desfazer pagamento</button>`
+        : `<button type="button" class="mark-paid" data-fast-payment="pago" data-order-id="${esc(order.id)}">R$ Marcar como pago</button>`;
       return `<article class="order-ticket status-${esc(order.status)}" data-order-card="${esc(order.id)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
         `<div class="customer"><span><small>CLIENTE</small><b>${esc(customer.name)}</b></span><span><small>WHATSAPP</small>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '-'}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span>${customer.email ? `<span><small>E-MAIL</small>${esc(customer.email)}</span>` : ''}</div>` +
         `<h4 class="order-section-title">ITENS DO PEDIDO</h4><div class="order-items">${itemsHtml}</div>${addressHtml}` +
-        `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span><span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span></div>` +
+        `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span><span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span><span class="email-status ${emailClass(storeEmailStatus)}">${esc(storeEmailText)}</span>${customer.email ? `<span class="email-status ${emailClass(customerEmailStatus)}">${esc(customerEmailText)}</span>` : ''}</div>` +
         (order.notes ? `<div class="order-notes"><b>Observações gerais:</b> ${esc(order.notes)}</div>` : '') +
         `<div class="order-totals"><div><span>Subtotal</span><b>${money(order.subtotal)}</b></div><div><span>Taxa de entrega</span><b>${money(order.delivery_fee)}</b></div><div class="grand-total"><span>TOTAL</span><b>${money(order.total)}</b></div></div>` +
-        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">Ver nota completa</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}<button type="button" class="confirm-order" data-fast-status="confirmado" data-order-id="${esc(order.id)}">✓ Confirmar pedido</button><button type="button" class="cancel-order" data-fast-status="cancelado" data-order-id="${esc(order.id)}">Cancelar pedido</button></div>` +
+        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">Ver nota completa</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${nextButton}${paymentButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
         `<div class="order-selects"><select aria-label="Status do pedido" data-order-status="${esc(order.id)}">${['novo', 'confirmado', 'preparando', 'saiu_entrega', 'concluido', 'cancelado'].map(value => `<option ${order.status === value ? 'selected' : ''} value="${value}">${statusLabel(value)}</option>`).join('')}</select>` +
         `<select aria-label="Status do pagamento" data-payment-status="${esc(order.id)}"><option ${order.payment_status === 'pendente' ? 'selected' : ''} value="pendente">Pagamento pendente</option><option ${order.payment_status === 'pago' ? 'selected' : ''} value="pago">Pagamento pago</option><option ${order.payment_status === 'estornado' ? 'selected' : ''} value="estornado">Pagamento estornado</option></select></div></footer></article>`;
     }).join('');
@@ -352,7 +441,16 @@
       select.addEventListener('change', () => updateOrder(select.dataset.orderStatus || select.dataset.paymentStatus));
     });
     box.querySelectorAll('[data-fast-status]').forEach(button => {
-      button.addEventListener('click', () => updateOrder(button.dataset.orderId, button.dataset.fastStatus));
+      button.addEventListener('click', () => updateOrder(button.dataset.orderId, { status: button.dataset.fastStatus }));
+    });
+    box.querySelectorAll('[data-fast-payment]').forEach(button => {
+      button.addEventListener('click', () => updateOrder(button.dataset.orderId, { paymentStatus: button.dataset.fastPayment }));
+    });
+    box.querySelectorAll('[data-delete-order]').forEach(button => {
+      button.addEventListener('click', () => openOrderDelete(button.dataset.deleteOrder));
+    });
+    box.querySelectorAll('[data-email-event]').forEach(button => {
+      button.addEventListener('click', () => resendOrderEmail(button.dataset.orderId, button.dataset.emailEvent));
     });
     box.querySelectorAll('[data-copy-order]').forEach(button => {
       button.addEventListener('click', async () => {
@@ -398,20 +496,89 @@
     box.replaceChildren(fragment);
   }
 
-  async function updateOrder(id, forcedStatus = '') {
+  async function updateOrder(id, changes = {}) {
+    const order = orders.find(item => String(item.id) === String(id));
+    if (!order) return;
     const statusSelect = $(`[data-order-status="${CSS.escape(id)}"]`);
-    const status = forcedStatus || statusSelect.value;
-    const paymentStatus = $(`[data-payment-status="${CSS.escape(id)}"]`).value;
+    const paymentSelect = $(`[data-payment-status="${CSS.escape(id)}"]`);
+    let status = changes.status || statusSelect?.value || order.status;
+    const paymentStatus = changes.paymentStatus || paymentSelect?.value || order.payment_status;
+    if (changes.paymentStatus === 'pago' && order.status === 'novo' && !changes.status) status = 'confirmado';
+    if (status === order.status && paymentStatus === order.payment_status) return;
+    const statusEvents = {
+      confirmado: 'confirmed', preparando: 'preparing', saiu_entrega: 'out_for_delivery',
+      concluido: 'completed', cancelado: 'cancelled'
+    };
+    const emailEvents = [];
+    if (status !== order.status && statusEvents[status]) emailEvents.push(statusEvents[status]);
+    if (paymentStatus !== order.payment_status && paymentStatus === 'pago' && !emailEvents.includes('confirmed')) emailEvents.push('payment_paid');
+    if (paymentStatus !== order.payment_status && paymentStatus === 'estornado') emailEvents.push('payment_refunded');
     try {
-      await SupabaseStore.updateOrder(id, status, paymentStatus);
-      const order = orders.find(item => String(item.id) === String(id));
+      const result = await SupabaseStore.updateOrder(id, status, paymentStatus, emailEvents);
       order.status = status;
       order.payment_status = paymentStatus;
+      (result.notifications || []).forEach(notification => {
+        if (notification.ok && notification.result?.sent) order.customer_email_status = 'enviado';
+        else if (!notification.ok) order.customer_email_status = 'erro';
+      });
       renderDashboard();
       renderOrders();
-      notice('Pedido atualizado.');
+      const failedEmail = (result.notifications || []).some(notification => !notification.ok);
+      notice(failedEmail ? 'Pedido atualizado. O e-mail ficou pendente para revisão.' : 'Pedido atualizado e movido automaticamente no CRM.', failedEmail);
     } catch (error) {
       notice(error.message, true);
+    }
+  }
+
+  async function resendOrderEmail(id, event) {
+    const order = orders.find(item => String(item.id) === String(id));
+    if (!order) return;
+    try {
+      const result = await SupabaseStore.notifyOrderEmail(id, event);
+      if (!result.sent) throw new Error(result.error || (result.configured === false ? 'Ative o webhook do Make nas configurações.' : 'O e-mail não foi enviado.'));
+      if (event === 'created') order.store_email_status = 'enviado';
+      else order.customer_email_status = 'enviado';
+      order.email_error = '';
+      renderOrders();
+      notice(event === 'created' ? 'Nota enviada à loja pelo Make.' : 'E-mail reenviado ao cliente pelo Make.');
+    } catch (error) {
+      if (event === 'created') order.store_email_status = 'erro';
+      else order.customer_email_status = 'erro';
+      order.email_error = error.message;
+      renderOrders();
+      notice(error.message, true);
+    }
+  }
+
+  function openOrderDelete(id) {
+    const order = orders.find(item => String(item.id) === String(id));
+    if (!order) return;
+    deletingOrder = id;
+    $('#order-delete-message').textContent = `Excluir ${order.order_number}? O pedido e o histórico de automações serão removidos definitivamente.`;
+    $('#confirm-order-delete').hidden = false;
+    document.body.classList.add('dialog-open');
+  }
+
+  async function deleteSelectedOrder() {
+    if (!deletingOrder) return;
+    const button = $('#do-order-delete');
+    button.disabled = true;
+    button.textContent = 'Excluindo...';
+    try {
+      await SupabaseStore.deleteOrder(deletingOrder);
+      orders = orders.filter(order => String(order.id) !== String(deletingOrder));
+      knownOrderIds.delete(String(deletingOrder));
+      renderDashboard();
+      renderOrders();
+      notice('Pedido excluído com segurança.');
+    } catch (error) {
+      notice(error.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Excluir pedido';
+      $('#confirm-order-delete').hidden = true;
+      document.body.classList.remove('dialog-open');
+      deletingOrder = null;
     }
   }
 
@@ -566,6 +733,10 @@
     button.textContent = 'Publicando...';
     try {
       await SupabaseStore.saveCatalog(catalog);
+      if (privateSettings.available || privateSettings.makeWebhookEnabled || privateSettings.makeWebhookUrl) {
+        privateSettings = await SupabaseStore.savePrivateSettings(privateSettings);
+        updateMakeWebhookStatus(privateSettings.makeWebhookEnabled ? 'Webhook salvo e automação ativada.' : 'Webhook salvo; automação desativada.');
+      }
       notice('Alterações publicadas no cardápio.');
       renderAll();
     } catch (error) {
@@ -573,6 +744,26 @@
     } finally {
       button.disabled = false;
       button.textContent = '✓ Publicar alterações';
+    }
+  }
+
+  async function testMakeWebhook() {
+    collect();
+    const button = $('#test-make-webhook');
+    button.disabled = true;
+    button.textContent = 'Testando...';
+    try {
+      privateSettings = await SupabaseStore.savePrivateSettings(privateSettings);
+      const result = await SupabaseStore.testMakeWebhook();
+      if (!result.sent) throw new Error(result.error || 'O Make não confirmou o recebimento do teste.');
+      updateMakeWebhookStatus('✓ Teste recebido pelo Make. Confira a execução do cenário e o Mailgun.');
+      notice('Webhook do Make testado com sucesso.');
+    } catch (error) {
+      updateMakeWebhookStatus(error.message, true);
+      notice(error.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Testar webhook';
     }
   }
 
@@ -629,6 +820,15 @@
     });
     $('#save-all').onclick = saveAll;
     $('#refresh-orders').onclick = () => refreshOrders(true);
+    $('#order-period').onchange = event => {
+      orderPeriod = event.target.value;
+      $('#order-date-field').hidden = orderPeriod !== 'custom';
+      renderOrders();
+    };
+    $('#order-date').onchange = event => {
+      customOrderDate = event.target.value || localDateKey(new Date());
+      if (orderPeriod === 'custom') renderOrders();
+    };
     $('#order-board-view').onclick = () => {
       orderView = 'board';
       $('#order-board-view').classList.add('active');
@@ -679,6 +879,12 @@
       document.body.classList.remove('dialog-open');
       deleting = null;
     };
+    $('#cancel-order-delete').onclick = () => {
+      $('#confirm-order-delete').hidden = true;
+      document.body.classList.remove('dialog-open');
+      deletingOrder = null;
+    };
+    $('#do-order-delete').onclick = deleteSelectedOrder;
     $('#do-delete').onclick = async () => {
       const previous = catalog.products;
       catalog.products = catalog.products.filter(product => product.id !== deleting);
@@ -710,10 +916,18 @@
       $('#edit-image').value = '';
       renderProductPhoto();
     };
+    $('#toggle-make-webhook').onclick = () => {
+      const input = $('#make-webhook-url');
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      $('#toggle-make-webhook').textContent = visible ? 'Mostrar URL' : 'Ocultar URL';
+    };
+    $('#test-make-webhook').onclick = testMakeWebhook;
     $('#store-status-mode').onchange = updateLiveStoreStatus;
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
-      if (!$('#confirm-delete').hidden) $('#cancel-delete').click();
+      if (!$('#confirm-order-delete').hidden) $('#cancel-order-delete').click();
+      else if (!$('#confirm-delete').hidden) $('#cancel-delete').click();
       else if (!$('#product-dialog').hidden) closeEditor();
     });
   }

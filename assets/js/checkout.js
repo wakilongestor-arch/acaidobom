@@ -151,8 +151,9 @@
     const data = formData();
     const error = $('#checkout-error');
     let message = '';
-    if (step === 1 && (!String(data.name || '').trim() || String(data.phone || '').replace(/\D/g, '').length < 10)) {
-      message = 'Informe seu nome e um WhatsApp válido.';
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email || '').trim());
+    if (step === 1 && (!String(data.name || '').trim() || String(data.phone || '').replace(/\D/g, '').length < 10 || !emailValid)) {
+      message = 'Informe seu nome, um WhatsApp válido e o e-mail que receberá a confirmação.';
     }
     if (step === 2 && data.fulfillment === 'delivery' && (!data.street || !data.number || !data.neighborhood || !data.city)) {
       message = 'Preencha rua, número, bairro e cidade.';
@@ -266,16 +267,21 @@
         ? 'Seu pedido foi enviado ao painel e ao WhatsApp da loja automaticamente.'
         : result.notificationError
           ? 'Seu pedido está seguro no painel. A automação do WhatsApp precisa ser revisada pela loja.'
-          : 'Seu pedido foi enviado automaticamente ao painel. Use o WhatsApp abaixo se quiser falar com a loja.')
+          : 'Seu pedido foi enviado automaticamente ao painel da loja.')
       : 'Não foi possível registrar no painel. Envie agora a nota completa pelo WhatsApp.';
+    const emailNotice = result.stored && result.customerEmail
+      ? (result.emailAutomationConfigured
+        ? `<div class="email-confirmation">✉ A confirmação será enviada automaticamente para <b>${String(result.customerEmail).replace(/[&<>"']/g, '')}</b> quando a loja confirmar o pedido.</div>`
+        : `<div class="email-confirmation pending">✉ Seu e-mail foi salvo. A loja ainda precisa ativar a automação de confirmação.</div>`)
+      : '';
     box.innerHTML = `<span class="success-icon">✓</span><small>${title}</small>` +
       `<h2>Obrigado ${String(name).split(' ')[0]}!</h2><p>${message}</p>` +
       `<div class="order-number"><small>NÚMERO DO PEDIDO</small><b>${result.orderNumber}</b></div>` +
+      emailNotice +
       (result.pixKey ? `<div class="pix"><span><small>CHAVE PIX</small><b>${result.pixKey}</b></span><button type="button" data-copy-pix>Copiar</button></div>` : '') +
       '<div class="success-links">' +
       (result.paymentUrl ? `<a href="${result.paymentUrl}" target="_blank" rel="noopener">Pagar on-line</a>` : '') +
       (result.whatsappUrl ? `<a class="wa" href="${result.whatsappUrl}" target="_blank" rel="noopener">Abrir WhatsApp novamente</a>` : '') +
-      (result.emailUrl ? `<a href="${result.emailUrl}">Enviar por e-mail</a>` : '') +
       '</div><button type="button" class="link-button" data-finish>Voltar ao cardápio</button>';
     box.querySelector('[data-copy-pix]')?.addEventListener('click', () => navigator.clipboard.writeText(result.pixKey));
     box.querySelector('[data-finish]').addEventListener('click', close);

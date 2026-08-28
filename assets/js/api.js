@@ -29,17 +29,19 @@
     const note = buildNote(orderNumber, payload);
     const settings = window.ACAI_CATALOG?.settings || {};
     const phone = String(settings.whatsapp || '').replace(/\D/g, '');
-    const email = settings.orderEmail || '';
     return {
       orderNumber,
       note,
       stored,
       whatsappUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(note)}` : '',
-      emailUrl: email ? `mailto:${email}?subject=${encodeURIComponent(`Pedido ${orderNumber}`)}&body=${encodeURIComponent(note)}` : '',
+      customerEmail: payload.customer.email || '',
       pixKey: settings.pixKey || '',
       paymentUrl: extra.paymentUrl || (payload.paymentMethod === 'payment_link' ? (settings.paymentLink || '') : ''),
       notificationSent: Boolean(extra.notificationSent),
-      notificationError: extra.notificationError || ''
+      notificationError: extra.notificationError || '',
+      storeEmailSent: Boolean(extra.storeEmailSent),
+      emailAutomationConfigured: Boolean(extra.emailAutomationConfigured),
+      emailNotificationError: extra.emailNotificationError || ''
     };
   }
 
@@ -52,7 +54,20 @@
         const settings = window.ACAI_CATALOG?.settings || {};
         let notificationSent = false;
         let notificationError = '';
+        let storeEmailSent = false;
+        let emailAutomationConfigured = false;
+        let emailNotificationError = '';
         let paymentUrl = '';
+        if (saved?.id) {
+          try {
+            const emailNotification = await window.SupabaseStore.notifyOrderEmail(saved.id, 'created');
+            storeEmailSent = emailNotification.sent === true;
+            emailAutomationConfigured = emailNotification.configured !== false;
+          } catch (error) {
+            emailNotificationError = error.message;
+            console.error('Pedido salvo; falha na automação de e-mail.', error);
+          }
+        }
         if (settings.whatsappCloudEnabled && saved?.id) {
           try {
             const notification = await window.SupabaseStore.notifyOrder(saved.id);
@@ -70,7 +85,14 @@
             console.error('Pedido salvo; falha ao criar checkout.', error);
           }
         }
-        return orderResult(orderNumber, payload, true, { notificationSent, notificationError, paymentUrl });
+        return orderResult(orderNumber, payload, true, {
+          notificationSent,
+          notificationError,
+          storeEmailSent,
+          emailAutomationConfigured,
+          emailNotificationError,
+          paymentUrl
+        });
       } catch (error) {
         console.error('Pedido não salvo no Supabase.', error);
       }

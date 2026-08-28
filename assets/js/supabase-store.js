@@ -46,6 +46,55 @@
     throwIfError(error, 'Não foi possível publicar as alterações.');
   }
 
+  async function loadPrivateSettings() {
+    const db = getClient();
+    if (!db) return { makeWebhookEnabled: false, makeWebhookUrl: '', available: false };
+    const { data, error } = await db
+      .from('private_settings')
+      .select('data')
+      .eq('id', 'integrations')
+      .maybeSingle();
+    if (error) {
+      if (error.code === '42P01' || /private_settings|schema cache/i.test(error.message || '')) {
+        return { makeWebhookEnabled: false, makeWebhookUrl: '', available: false };
+      }
+      throwIfError(error, 'Não foi possível carregar as integrações privadas.');
+    }
+    return { makeWebhookEnabled: false, makeWebhookUrl: '', ...(data?.data || {}), available: true };
+  }
+
+  async function savePrivateSettings(settings) {
+    const db = getClient();
+    if (!db) throw new Error('Configure o Supabase antes de salvar integrações.');
+    const makeWebhookEnabled = Boolean(settings.makeWebhookEnabled);
+    const makeWebhookUrl = String(settings.makeWebhookUrl || '').trim();
+    if (makeWebhookEnabled && !makeWebhookUrl) {
+      throw new Error('Cole a URL do webhook do Make antes de ativar a automação.');
+    }
+    if (makeWebhookUrl) {
+      let parsed;
+      try { parsed = new URL(makeWebhookUrl); } catch (error) { throw new Error('A URL do webhook do Make é inválida.'); }
+      const allowedHost = parsed.hostname === 'hook.make.com' || parsed.hostname.endsWith('.make.com');
+      if (parsed.protocol !== 'https:' || !allowedHost || parsed.username || parsed.password) {
+        throw new Error('Use uma URL HTTPS oficial do Make (hook.make.com ou subdomínio .make.com).');
+      }
+    }
+    const row = {
+      id: 'integrations',
+      data: {
+        makeWebhookEnabled,
+        makeWebhookUrl
+      },
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await db.from('private_settings').upsert(row, { onConflict: 'id' });
+    if (error && (error.code === '42P01' || /private_settings|schema cache/i.test(error.message || ''))) {
+      throw new Error('Execute database/migrations/003_make_order_automation.sql no Supabase antes de salvar o webhook.');
+    }
+    throwIfError(error, 'Não foi possível salvar o webhook do Make.');
+    return { ...row.data, available: true };
+  }
+
   async function createOrder(payload, orderNumber) {
     const db = getClient();
     if (!db) return false;
@@ -78,6 +127,22 @@
     return data || {};
   }
 
+  async function notifyOrderEmail(orderId, event = 'created') {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { data, error } = await db.functions.invoke('order-email', { body: { orderId, event } });
+    throwIfError(error, 'O pedido foi salvo, mas o e-mail automático não pôde ser solicitado.');
+    return data || {};
+  }
+
+  async function testMakeWebhook() {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { data, error } = await db.functions.invoke('order-email', { body: { event: 'test' } });
+    throwIfError(error, 'Não foi possível testar o webhook do Make.');
+    return data || {};
+  }
+
   async function createCheckout(orderId, provider) {
     const db = getClient();
     if (!db) throw new Error('Supabase não configurado.');
@@ -93,18 +158,37 @@
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(500);
+      .limit(1000);
     throwIfError(error, 'Não foi possível carregar os pedidos.');
     return data || [];
   }
 
-  async function updateOrder(id, status, paymentStatus) {
+  async function updateOrder(id, status, paymentStatus, emailEvents = []) {
     const db = getClient();
     const { error } = await db
       .from('orders')
       .update({ status, payment_status: paymentStatus, updated_at: new Date().toISOString() })
       .eq('id', id);
     throwIfError(error, 'Não foi possível atualizar o pedido.');
+    const notifications = [];
+    for (const event of [...new Set(emailEvents)]) {
+      try {
+        notifications.push({ event, ok: true, result: await notifyOrderEmail(id, event) });
+      } catch (notificationError) {
+        notifications.push({ event, ok: false, error: notificationError.message });
+      }
+    }
+    return { notifications };
+  }
+
+  async function deleteOrder(id) {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { error } = await db.from('orders').delete().eq('id', id);
+    if (error && /permission|policy|denied/i.test(error.message || '')) {
+      throw new Error('Execute a migração 003 no Supabase para liberar a exclusão segura de pedidos.');
+    }
+    throwIfError(error, 'Não foi possível excluir o pedido.');
   }
 
   async function optimizeImage(file) {
@@ -188,11 +272,16 @@
     getClient,
     loadCatalog,
     saveCatalog,
+    loadPrivateSettings,
+    savePrivateSettings,
     createOrder,
     notifyOrder,
+    notifyOrderEmail,
+    testMakeWebhook,
     createCheckout,
     listOrders,
     updateOrder,
+    deleteOrder,
     uploadImage,
     signIn,
     getSession,
