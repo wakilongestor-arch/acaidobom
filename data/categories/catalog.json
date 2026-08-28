@@ -9,6 +9,7 @@
     "id": "acai",
     "name": "Açaí",
     "emoji": "🥣",
+    "imageUrl": "assets/images/categories/acai.jpg",
     "active": true
   },
   {
@@ -21,12 +22,14 @@
     "id": "lanches",
     "name": "Lanches",
     "emoji": "🍔",
+    "imageUrl": "assets/images/categories/lanches.jpg",
     "active": true
   },
   {
     "id": "pasteis",
     "name": "Pastéis",
     "emoji": "🥟",
+    "imageUrl": "assets/images/categories/pasteis.jpg",
     "active": true
   },
   {

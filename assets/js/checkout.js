@@ -61,18 +61,21 @@
   }
 
   function open(nextCatalog) {
+    if (window.MenuStoreStatus && !window.MenuStoreStatus.get().open) return false;
     catalog = nextCatalog;
     step = 1;
     lastRestoredPhone = '';
     $('#returning-customer').hidden = true;
     render();
     $('#checkout-overlay').hidden = false;
-    document.body.classList.add('no-scroll');
+    window.syncMenuScroll?.();
+    requestAnimationFrame(() => $('#checkout-form').elements.namedItem('phone')?.focus());
+    return true;
   }
 
   function close() {
     $('#checkout-overlay').hidden = true;
-    document.body.classList.remove('no-scroll');
+    window.syncMenuScroll?.();
     $('#order-success').hidden = true;
     $('#checkout-form').hidden = false;
     $('#checkout-form').reset();
@@ -147,6 +150,13 @@
 
   async function submit(event) {
     event.preventDefault();
+    if (window.MenuStoreStatus && !window.MenuStoreStatus.get().open) {
+      const error = $('#checkout-error');
+      error.textContent = 'A loja está fechada neste momento. Seu carrinho continuará salvo para você pedir quando abrir.';
+      error.hidden = false;
+      window.MenuStoreStatus.refresh();
+      return;
+    }
     const data = formData();
     const delivery = data.fulfillment === 'delivery' ? Number(catalog.settings.deliveryFee) : 0;
     if (CartStore.subtotal() < Number(catalog.settings.minOrder) && data.fulfillment === 'delivery') {
@@ -227,6 +237,9 @@
     });
     $('#checkout-back').addEventListener('click', () => { step = Math.max(1, step - 1); render(); });
     $('#close-checkout').addEventListener('click', close);
+    $('#checkout-overlay').addEventListener('click', event => {
+      if (event.target.id === 'checkout-overlay') close();
+    });
     $('#checkout-form').addEventListener('submit', submit);
     const phone = $('#checkout-form').elements.namedItem('phone');
     phone.addEventListener('input', () => {

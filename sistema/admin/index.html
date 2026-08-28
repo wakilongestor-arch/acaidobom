@@ -7,14 +7,14 @@
   <title>Painel | Açaí do Bom</title>
   <link rel="stylesheet" href="admin.css">
   <style>
-    .auth-screen{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#26011a,#620853,#be13af)}
+    .auth-screen{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#26011a,#620853)}
     .auth-card{width:min(440px,100%);background:#fff;border-radius:24px;padding:32px;box-shadow:0 24px 70px #19092366}
     .auth-brand{display:flex;gap:14px;align-items:center;margin-bottom:26px}.auth-brand>span{display:grid;place-items:center;width:150px;height:72px}.auth-brand img{width:100%;height:100%;object-fit:contain}
     .auth-brand b{display:block;font-size:20px}.auth-brand small{color:#7b7280}.auth-card h1{font-size:28px;margin:0 0 6px}.auth-card>p{color:#6f6672;margin:0 0 24px}
     .auth-card label{display:grid;gap:7px;margin:14px 0;font-weight:700}.auth-card input{width:100%;padding:14px;border:1px solid #d9d2dc;border-radius:12px;font:inherit}
-    .auth-card button{width:100%;padding:14px;border:0;border-radius:12px;background:#620853;color:#fff;font:inherit;font-weight:800;cursor:pointer}.auth-error{color:#b42318;background:#fff0ee;padding:10px;border-radius:10px}.setup-box{background:#fff7db;color:#5f4700;padding:14px;border-radius:12px;margin-top:16px}.setup-box a{color:#620853;font-weight:800}
+    .auth-card button{width:100%;padding:14px;border:0;border-radius:12px;background:#620853;color:#fff;font:inherit;font-weight:800;cursor:pointer}.auth-error{color:#620853;background:#fff7b8;padding:10px;border-radius:10px}.setup-box{background:#fff7b8;color:#26011a;padding:14px;border-radius:12px;margin-top:16px}.setup-box a{color:#620853;font-weight:800}
     .admin-layout>aside{background:#26011a}.admin-head>button,.primary{background:#620853}.admin-logo>span{width:88px!important;height:50px!important;border:0!important;border-radius:0!important;background:transparent!important}.admin-logo>span img{width:100%;height:100%;object-fit:contain}.admin-logo div{display:none!important}
-    .order-items{display:grid;gap:8px;margin:14px 0}.order-item{padding:10px;border-radius:9px;background:#f8f2f9}.order-item>b{display:block;color:#620853}.order-item small{display:block;margin-top:4px;color:#756979;line-height:1.5}.order-address{margin:10px 0;padding:11px;border-left:4px solid #fcd307;border-radius:7px;background:#fff9df;font-size:12px;line-height:1.55}.order-meta{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.order-meta span{padding:6px 9px;border-radius:999px;background:#f1e7f4;color:#620853;font-size:10px;font-weight:800}.order-notes{padding:9px;border-radius:8px;background:#fff0f1;color:#7d2933;font-size:11px}
+    .order-items{display:grid;gap:8px;margin:14px 0}.order-item{padding:12px;border-radius:9px;background:#fff;border:1px solid #62085322}.order-item>b{display:block;color:#620853}.order-item small{display:block;margin-top:5px;color:#620853;line-height:1.5}.order-address{margin:10px 0;padding:12px;border-left:4px solid #fcd307;border-radius:7px;background:#fff9cf;font-size:12px;line-height:1.55}.order-meta{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.order-meta span{padding:6px 9px;border-radius:999px;background:#620853;color:#fff;font-size:10px;font-weight:800}.order-notes{padding:10px;border-radius:8px;background:#fff9cf;color:#620853;font-size:11px}
     [hidden]{display:none!important}
   </style>
 </head>
@@ -62,7 +62,7 @@
         <div class="settings-grid">
           <article class="card"><h3>Logo da loja</h3><div class="upload-preview logo" id="logo-preview">A</div><label class="upload">Enviar nova logo<input type="file" data-upload="logo" accept="image/*"></label><label>URL da logo<input id="logo-url"></label></article>
           <article class="card"><h3>Banner principal</h3><div class="upload-preview banner" id="banner-preview"></div><label class="upload">Trocar banner<input type="file" data-upload="banner" accept="image/*"></label><label>URL do banner<input id="banner-url"></label></article>
-          <article class="card"><h3>Cores da marca</h3><label>Cor principal<div class="color"><input type="color" id="primary-color"><input id="primary-text"></div></label><label>Cor de destaque<div class="color"><input type="color" id="accent-color"><input id="accent-text"></div></label></article>
+          <article class="card"><h3>Paleta oficial</h3><p>O cardápio usa somente as cores oficiais da marca.</p><div class="brand-swatches"><span><i style="background:#620853"></i>Roxo</span><span><i style="background:#fcd307"></i>Amarelo</span><span><i style="background:#fff"></i>Branco</span></div></article>
           <article class="card"><h3>Texto principal</h3><label>Nome da loja<input id="store-name"></label><label>Chamada do banner<input id="store-tagline"></label></article>
         </div>
       </section>
@@ -70,10 +70,11 @@
       <section class="tab" data-panel="settings">
         <div class="title"><small>OPERAÇÃO E INTEGRAÇÕES</small><h2>Configurações</h2></div>
         <div class="settings-grid">
-          <article class="card"><h3>Loja e entrega</h3><label class="switch-line"><span><b>Loja aberta</b><small>Indica que está recebendo pedidos</small></span><input type="checkbox" id="store-open"></label><label>Cidade atendida<input id="store-city"></label><label>Endereço<input id="store-address"></label><div class="two"><label>Taxa de entrega<input type="number" step=".01" id="delivery-fee"></label><label>Pedido mínimo<input type="number" step=".01" id="min-order"></label></div><label>Tempo estimado<input id="estimated-time"></label></article>
+          <article class="card operation-settings"><h3>Loja e entrega</h3><label>Funcionamento<select id="store-status-mode"><option value="auto">Automático pelos horários</option><option value="open">Forçar loja aberta</option><option value="closed">Forçar loja fechada</option></select></label><div class="live-store-status" id="live-store-status"></div><label>Cidade atendida<input id="store-city"></label><label>Endereço<input id="store-address"></label><div class="two"><label>Taxa de entrega<input type="number" step=".01" id="delivery-fee"></label><label>Pedido mínimo<input type="number" step=".01" id="min-order"></label></div><label>Tempo estimado<input id="estimated-time"></label></article>
+          <article class="card hours-card"><h3>Horários de funcionamento</h3><p>Ative os dias e informe abertura e fechamento. Horários que passam da meia-noite são reconhecidos automaticamente.</p><div id="hours-editor"></div></article>
           <article class="card"><h3>Pedidos e pagamentos</h3><label>WhatsApp dos pedidos<input id="store-whatsapp"></label><label>E-mail dos pedidos<input id="order-email"></label><label>Chave PIX<input id="pix-key"></label><label>Link do gateway de pagamento<input id="payment-link"></label></article>
           <article class="card"><h3>Rastreamento</h3><p>Use apenas os identificadores das plataformas.</p><label>Meta Pixel ID<input id="meta-pixel"></label><label>Google Tag Manager<input id="gtm-id" placeholder="GTM-XXXXXXX"></label><label>Google Analytics 4<input id="ga4-id" placeholder="G-XXXXXXXXXX"></label></article>
-          <article class="card"><header class="card-row"><h3>Categorias</h3><button id="add-category">+ Adicionar</button></header><div id="category-editor"></div></article>
+          <article class="card categories-card"><header class="card-row"><div><h3>Categorias</h3><p>Envie uma capa para cada categoria.</p></div><button id="add-category">+ Adicionar</button></header><div id="category-editor"></div></article>
         </div>
       </section>
     </main>
@@ -81,10 +82,10 @@
 
   <div class="dialog" id="product-dialog" hidden>
     <form id="product-form"><button type="button" class="close" data-close-product>×</button><h2 id="editor-title">Novo produto</h2><div class="editor-scroll">
-      <div class="product-basic"><div><div class="product-photo" id="product-photo">⬡</div><label class="upload">Enviar imagem<input type="file" data-upload="product" accept="image/*"></label></div><div><label>Nome do produto<input id="edit-name" required></label><label>Categoria<select id="edit-category"></select></label><div class="two"><label>Preço<input id="edit-price" type="number" step=".01" required></label><label>Selo<input id="edit-badge" placeholder="Mais pedido"></label></div></div></div>
+      <div class="product-basic"><div><div class="product-photo" id="product-photo">⬡</div><label class="upload">Enviar ou trocar imagem<input type="file" data-upload="product" accept="image/jpeg,image/png,image/webp"></label><button type="button" class="remove-image" id="remove-product-image">Remover imagem</button><small class="upload-help">A imagem é otimizada e armazenada no Supabase.</small></div><div><label>Nome do produto<input id="edit-name" required></label><label>Categoria<select id="edit-category"></select></label><div class="two"><label>Preço<input id="edit-price" type="number" step=".01" required></label><label>Selo<input id="edit-badge" placeholder="Mais pedido"></label></div></div></div>
       <label>Descrição<textarea id="edit-description"></textarea></label><label>URL da imagem<input id="edit-image"></label><div class="two switches"><label><input id="edit-active" type="checkbox"> Produto ativo</label><label><input id="edit-featured" type="checkbox"> Destaque</label></div>
       <section class="addons-editor"><header><div><h3>Adicionais e etapas</h3><p>Grupos obrigatórios ou opcionais para montar o pedido.</p></div><button type="button" id="add-group">+ Novo grupo</button></header><div id="addon-groups"></div></section>
-    </div><footer><button type="button" data-close-product>Cancelar</button><button class="primary">Salvar produto</button></footer></form>
+    </div><footer><button type="button" data-close-product>Cancelar</button><button class="primary" id="save-product">Confirmar e publicar produto</button></footer></form>
   </div>
   <div class="confirm" id="confirm-delete" hidden><div><h3>Excluir produto?</h3><p>Ele será removido após publicar as alterações.</p><footer><button id="cancel-delete">Cancelar</button><button id="do-delete">Excluir</button></footer></div></div>
 

@@ -1,14 +1,92 @@
-/* Identidade visual extraída da logo oficial do Açaí do Bom. */
-:root{--brand:#620853;--brand-dark:#26011a;--brand-bright:#be13af;--accent:#fcd307;--paper:#fffaf2}
+/* Identidade oficial: somente roxo, amarelo e branco. */
+:root{
+  --brand:#620853;
+  --brand-dark:#26011a;
+  --brand-bright:#620853;
+  --accent:#fcd307;
+  --paper:#ffffff;
+  --line:rgba(98,8,83,.14);
+  --ink:#26011a;
+}
+html,body{background:#fff}
+body.no-scroll{overflow:hidden;overscroll-behavior:none}
 .brand-mark.has-logo{width:152px;height:62px;border:0;border-radius:0;background:transparent;color:transparent}
 .brand-mark.has-logo img{display:block;width:100%;height:100%;object-fit:contain}
 .brand.has-image>span:last-child{display:none}
-.hero-shade{background:linear-gradient(90deg,var(--brand-dark) 0%,rgba(38,1,26,.86) 37%,rgba(38,1,26,.12) 75%,transparent)}
-.whatsapp-callout{background:linear-gradient(115deg,var(--brand-dark),var(--brand))}
-.primary,.cart-toggle,.mobile-cart{box-shadow:0 9px 24px rgba(98,8,83,.23)}
-.primary:hover,.cart-toggle:hover{background:var(--brand-bright)}
-.returning-customer{padding:11px 13px;border:1px solid #b6dfc0;border-radius:10px;background:#effbf2;color:#18713a;font-size:12px;font-weight:800}
-.remember-profile{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #eadfeb;border-radius:11px;background:#fffaf2;cursor:pointer}
+.topbar{background:rgba(255,255,255,.97);border-color:rgba(98,8,83,.12)}
+.hero{background:var(--brand)}
+.hero-shade{background:linear-gradient(90deg,var(--brand-dark) 0%,rgba(38,1,26,.88) 39%,rgba(98,8,83,.16) 78%,transparent)}
+.info-strip,.product-card,.modal,.cart,.card{background:#fff}
+.whatsapp-callout{background:var(--brand)}
+.footer{background:var(--brand-dark)}
+.primary,.cart-toggle,.mobile-cart{background:var(--brand);box-shadow:0 9px 24px rgba(98,8,83,.23)}
+.primary:hover,.cart-toggle:hover{background:var(--brand-dark)}
+.primary:disabled,.cart-toggle:disabled{cursor:not-allowed;opacity:.58;box-shadow:none}
+.cta,.whatsapp-callout a{background:var(--accent);color:var(--brand-dark)}
+.open-status{display:inline-flex;align-items:center;padding:8px 11px;border:1px solid rgba(252,211,7,.65);border-radius:999px;color:#fff}
+.open-status.closed{background:var(--accent);color:var(--brand-dark)}
+.returning-customer{padding:11px 13px;border:1px solid var(--accent);border-radius:10px;background:#fff9cf;color:var(--brand);font-size:12px;font-weight:800}
+.remember-profile{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--line);border-radius:11px;background:#fff;cursor:pointer}
 .remember-profile input{width:18px;height:18px;margin-top:2px;accent-color:var(--brand)}
-.remember-profile span{display:grid;gap:3px}.remember-profile b{font-size:12px}.remember-profile small{color:#756979;font-size:10px;line-height:1.4}
-@media(max-width:700px){.brand-mark.has-logo{width:116px;height:52px}.topbar{padding-left:12px;padding-right:12px}.footer .brand-mark.has-logo{width:180px;height:90px}}
+.remember-profile span{display:grid;gap:3px}
+.remember-profile b{font-size:12px}
+.remember-profile small{color:var(--brand);font-size:10px;line-height:1.4}
+
+/* Categorias com capa visual. */
+.categories{align-items:stretch;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 10px;scrollbar-color:var(--brand) transparent}
+.categories button{
+  width:142px;
+  height:116px;
+  padding:0;
+  display:grid;
+  grid-template-rows:82px 34px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:17px;
+  background:#fff;
+  color:var(--brand);
+  scroll-snap-align:start;
+  box-shadow:0 8px 22px rgba(98,8,83,.09)
+}
+.categories button .category-media{position:relative;width:100%;height:82px;margin:0;display:grid;place-items:center;overflow:hidden;background:var(--brand);font-size:32px}
+.categories button .category-media img{width:100%;height:100%;object-fit:cover}
+.categories button .category-media em{display:grid;place-items:center;width:100%;height:100%;font-style:normal}
+.categories button>b{display:grid;place-items:center;padding:0 8px;font-size:12px}
+.categories button.active,.categories button:hover{border-color:var(--accent);background:var(--brand);color:#fff;transform:translateY(-2px)}
+.categories button.active{box-shadow:0 0 0 3px var(--accent),0 10px 24px rgba(98,8,83,.18)}
+.product-card{border-color:var(--line)}
+.product-media{background:#fff}
+.product-copy footer>span,.quantity button{background:rgba(98,8,83,.08);color:var(--brand)}
+
+/* Modal estável no computador e no celular. */
+.overlay{overscroll-behavior:contain}
+.product-modal{display:flex;flex-direction:column;max-height:min(94vh,820px)}
+.product-modal-head,.modal-footer{flex:0 0 auto}
+.addon-list{flex:1 1 auto;min-height:80px;max-height:none;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.addon-list label{touch-action:manipulation;user-select:none}
+.addon-list label.selected,.fulfillment input:checked+span{background:#fff9cf;border-color:var(--accent)}
+.modal-footer{grid-template-columns:auto minmax(0,1fr);align-items:center;background:#fff}
+.product-actions{display:grid;grid-template-columns:minmax(96px,.7fr) minmax(190px,1.5fr);gap:9px}
+.product-actions button{height:46px;border-radius:11px;font-weight:900}
+.secondary{border:1px solid var(--brand);background:#fff;color:var(--brand);cursor:pointer}
+.success-icon{background:var(--accent);color:var(--brand)}
+.success-links .wa{background:var(--brand)}
+.summary,.order-number{background:#fff9cf}
+
+@media(max-width:700px){
+  .brand-mark.has-logo{width:116px;height:52px}
+  .topbar{padding-left:12px;padding-right:12px}
+  .footer .brand-mark.has-logo{width:180px;height:90px}
+  .categories{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+  .categories button{width:118px;height:102px;grid-template-rows:70px 32px;border-radius:15px}
+  .categories button .category-media{height:70px}
+  .modal-footer{grid-template-columns:106px minmax(0,1fr)}
+  .product-actions{grid-template-columns:1fr}
+  .product-actions button{height:40px}
+}
+@media(max-width:430px){
+  .modal-footer{grid-template-columns:1fr}
+  .quantity{width:max-content}
+  .product-actions{grid-template-columns:1fr 1.6fr}
+}
+

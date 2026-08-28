@@ -90,18 +90,58 @@
     throwIfError(error, 'Não foi possível atualizar o pedido.');
   }
 
-  async function uploadImage(file) {
+  async function optimizeImage(file) {
+    let source;
+    try {
+      source = await createImageBitmap(file);
+    } catch (error) {
+      source = await new Promise((resolve, reject) => {
+        const image = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        image.onload = () => { URL.revokeObjectURL(objectUrl); resolve(image); };
+        image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Não foi possível ler esta imagem.')); };
+        image.src = objectUrl;
+      });
+    }
+    const width = source.width || source.naturalWidth;
+    const height = source.height || source.naturalHeight;
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(width, height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext('2d', { alpha: true });
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    source.close?.();
+    const optimized = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.84));
+    if (!optimized) throw new Error('Não foi possível otimizar a imagem.');
+    return optimized;
+  }
+
+  async function uploadImage(file, folder = 'geral') {
     const db = getClient();
+    if (!db) throw new Error('Configure o Supabase antes de enviar imagens.');
     if (!file?.type?.startsWith('image/')) throw new Error('Selecione uma imagem válida.');
-    if (file.size > 5 * 1024 * 1024) throw new Error('A imagem deve ter no máximo 5 MB.');
-    const extension = (file.name.split('.').pop() || 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase();
-    const path = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${extension}`;
-    const { error } = await db.storage.from('menu-images').upload(path, file, {
+    if (file.size > 12 * 1024 * 1024) throw new Error('A imagem original deve ter no máximo 12 MB.');
+    const { data: sessionData } = await db.auth.getSession();
+    if (!sessionData?.session) throw new Error('Sua sessão expirou. Entre novamente no painel.');
+    const optimized = await optimizeImage(file);
+    if (optimized.size > 5 * 1024 * 1024) throw new Error('A imagem ficou maior que 5 MB mesmo após a otimização.');
+    const safeFolder = String(folder || 'geral').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+    const path = `${safeFolder}/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.webp`;
+    const { error } = await db.storage.from('menu-images').upload(path, optimized, {
       cacheControl: '31536000',
-      contentType: file.type,
+      contentType: 'image/webp',
       upsert: false
     });
-    throwIfError(error, 'Não foi possível enviar a imagem.');
+    if (error) {
+      const missingBucket = /bucket|row-level|policy|not found/i.test(error.message || '');
+      throw new Error(missingBucket
+        ? 'O armazenamento de imagens ainda não está liberado. Execute novamente database/supabase.sql no Supabase.'
+        : (error.message || 'Não foi possível enviar a imagem.'));
+    }
     return db.storage.from('menu-images').getPublicUrl(path).data.publicUrl;
   }
 

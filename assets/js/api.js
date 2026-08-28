@@ -78,42 +78,55 @@
   }
 
   function buildNote(number, payload) {
+    const paymentNames = {
+      pix: 'PIX',
+      card_delivery: 'Cartão na entrega',
+      cash: 'Dinheiro',
+      payment_link: 'Pagamento on-line'
+    };
     const lines = [
-      `🟣 *AÇAÍ DO BOM — PEDIDO ${number}*`,
+      '━━━━━━━━━━━━━━━━━━━━',
+      `🟣 *AÇAÍ DO BOM*`,
+      `*PEDIDO ${number}*`,
+      '━━━━━━━━━━━━━━━━━━━━',
       '',
-      `👤 Cliente: ${payload.customer.name}`,
-      `📱 Telefone: ${payload.customer.phone}`
+      '👤 *CLIENTE*',
+      `Nome: ${payload.customer.name}`,
+      `WhatsApp: ${payload.customer.phone}`
     ];
-    if (payload.customer.email) lines.push(`✉️ E-mail: ${payload.customer.email}`);
-    lines.push('', '🧾 *ITENS*');
+    if (payload.customer.email) lines.push(`E-mail: ${payload.customer.email}`);
+    lines.push('', '🧾 *ITENS DO PEDIDO*');
     payload.items.forEach((item, index) => {
-      lines.push(`${index + 1}. ${item.quantity}x ${item.name} — ${money(item.unitTotal * item.quantity)}`);
+      lines.push('', `${index + 1}. *${item.quantity}x ${item.name}*`, `   Valor: ${money(item.unitTotal * item.quantity)}`);
       (item.selections || []).forEach(selection => {
         lines.push(`   ${selection.groupName}: ${selection.options.map(option => option.name).join(', ')}`);
       });
-      if (item.notes) lines.push(`   Obs: ${item.notes}`);
+      if (item.notes) lines.push(`   Observação: ${item.notes}`);
     });
     lines.push(
       '',
+      '💰 *VALORES*',
       `Subtotal: ${money(payload.subtotal)}`,
       `Entrega: ${money(payload.deliveryFee)}`,
       `*TOTAL: ${money(payload.total)}*`,
       '',
-      `Pagamento: ${payload.paymentMethod}`
+      `💳 Pagamento: ${paymentNames[payload.paymentMethod] || payload.paymentMethod}`
     );
     if (payload.changeFor) lines.push(`Troco para: ${payload.changeFor}`);
     if (payload.fulfillment === 'delivery') {
       const address = payload.address;
       lines.push(
         '',
-        `📍 ${address.street}, ${address.number}${address.complement ? ` — ${address.complement}` : ''}`,
+        '📍 *ENDEREÇO DE ENTREGA*',
+        `${address.street}, ${address.number}${address.complement ? ` — ${address.complement}` : ''}`,
         `${address.neighborhood} — ${address.city}${address.zip ? ` — CEP ${address.zip}` : ''}`
       );
       if (address.reference) lines.push(`Referência: ${address.reference}`);
     } else {
       lines.push('', '🏪 Retirada no local');
     }
-    if (payload.notes) lines.push('', `Observações gerais: ${payload.notes}`);
+    if (payload.notes) lines.push('', `📝 *OBSERVAÇÕES GERAIS*`, payload.notes);
+    lines.push('', '━━━━━━━━━━━━━━━━━━━━');
     return lines.join('\n');
   }
 
