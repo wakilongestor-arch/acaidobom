@@ -348,7 +348,7 @@
       button.onclick = () => {
         const productId = button.dataset.suggestion;
         closeCart();
-        requestAnimationFrame(() => openProduct(productId, button));
+        openProduct(productId, button);
       };
     });
     applyStoreStateToCheckout();
