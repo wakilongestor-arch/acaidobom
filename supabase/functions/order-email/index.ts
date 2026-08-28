@@ -15,6 +15,11 @@ const entities: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
 };
 const html = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, character => entities[character] || character);
+const brandLogoUrl = 'https://acaidobom.com.br/assets/images/logo/logo-acai-do-bom.webp';
+const firstName = (value: unknown) => {
+  const name = String(value ?? '').trim().split(/\s+/)[0] || 'cliente';
+  return name.charAt(0).toLocaleUpperCase('pt-BR') + name.slice(1).toLocaleLowerCase('pt-BR');
+};
 
 const eventNames: Record<string, string> = {
   created: 'order.created',
@@ -105,7 +110,7 @@ function itemRows(order: any) {
 function emailFrame(title: string, intro: string, content: string, store: any) {
   const name = html(store.establishmentName || store.storeName || 'Açaí do Bom');
   const contact = html(store.publicEmail || store.orderEmail || 'contato@acaidobom.com.br');
-  return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#f5f3f5;font-family:Arial,sans-serif;color:#251222"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:24px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:auto;background:#fff;border-radius:18px;overflow:hidden"><tr><td style="background:#620853;color:#fff;padding:24px;border-bottom:6px solid #fcd307"><div style="font-size:12px;letter-spacing:1px;text-transform:uppercase">${name}</div><h1 style="font-size:25px;margin:8px 0 0">${html(title)}</h1></td></tr><tr><td style="padding:26px"><p style="font-size:16px;line-height:1.55;margin-top:0">${html(intro)}</p>${content}</td></tr><tr><td style="background:#fff8c7;padding:18px 26px;font-size:12px;color:#5c4058">Mensagem automática de ${name}. Dúvidas: ${contact}</td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>@media only screen and (max-width:620px){.email-wrap{padding:12px 8px!important}.email-content{padding:24px 20px!important}.email-title{font-size:27px!important}.brand-logo{width:170px!important}}</style></head><body style="margin:0;background:#f5f1f6;font-family:Arial,Helvetica,sans-serif;color:#281225"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${html(intro)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1f6"><tr><td class="email-wrap" style="padding:28px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 8px 28px rgba(77,9,65,.10)"><tr><td align="center" style="background-color:#620853;background-image:linear-gradient(135deg,#510544 0%,#810b6d 100%);padding:25px 24px 28px;border-bottom:7px solid #fcd307"><img class="brand-logo" src="${brandLogoUrl}" width="190" alt="${name}" style="display:block;width:190px;max-width:70%;height:auto;margin:0 auto 18px"><div style="display:inline-block;background:#fcd307;color:#4a073f;border-radius:999px;padding:7px 13px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Atualização do pedido</div><h1 class="email-title" style="color:#ffffff;font-size:31px;line-height:1.15;margin:14px 0 0">${html(title)}</h1></td></tr><tr><td class="email-content" style="padding:30px 34px"><p style="font-size:17px;line-height:1.65;margin:0;color:#32142d">${html(intro)}</p>${content}</td></tr><tr><td style="background:#fff7c7;padding:20px 28px;text-align:center;font-size:12px;line-height:1.6;color:#684761"><b>${name}</b><br>Mensagem automática. Precisa de ajuda? <a href="mailto:${contact}" style="color:#620853;font-weight:700">${contact}</a></td></tr></table></td></tr></table></body></html>`;
 }
 
 function storeEmail(order: any, store: any, note: string) {
@@ -127,23 +132,73 @@ function storeEmail(order: any, store: any, note: string) {
 
 function customerEmail(order: any, store: any, event: string) {
   const customer = order.customer || {};
-  const messages: Record<string, { title: string; intro: string; subject: string }> = {
-    confirmed: { title: 'Pedido confirmado!', intro: `Olá, ${customer.name || 'cliente'}! Recebemos e confirmamos seu pedido.`, subject: `Pedido ${order.order_number} confirmado` },
-    preparing: { title: 'Estamos preparando', intro: `Seu pedido ${order.order_number} já está sendo preparado com carinho.`, subject: `Pedido ${order.order_number} em preparo` },
-    out_for_delivery: { title: 'Saiu para entrega', intro: `Seu pedido ${order.order_number} saiu para entrega. Fique de olho!`, subject: `Pedido ${order.order_number} saiu para entrega` },
-    completed: { title: 'Pedido concluído', intro: `Seu pedido ${order.order_number} foi concluído. Obrigado por escolher o Açaí do Bom!`, subject: `Pedido ${order.order_number} concluído` },
-    cancelled: { title: 'Pedido cancelado', intro: `O pedido ${order.order_number} foi cancelado. Fale conosco se precisar de ajuda.`, subject: `Pedido ${order.order_number} cancelado` },
-    payment_paid: { title: 'Pagamento confirmado', intro: `O pagamento do pedido ${order.order_number} foi confirmado.`, subject: `Pagamento do pedido ${order.order_number} confirmado` },
-    payment_refunded: { title: 'Pagamento estornado', intro: `O pagamento do pedido ${order.order_number} foi marcado como estornado.`, subject: `Pagamento do pedido ${order.order_number} estornado` }
+  const customerFirstName = firstName(customer.name);
+  const messages: Record<string, { title: string; intro: string; subject: string; emoji: string; status: string; detail: string }> = {
+    confirmed: {
+      title: 'Pedido confirmado! 🎉',
+      intro: `Olá, ${customerFirstName}! Seu pedido foi confirmado e já está sendo preparado com todo carinho. Assim que sair para entrega, avisaremos você por e-mail.`,
+      subject: `🎉 Pedido ${order.order_number} confirmado e em preparo`,
+      emoji: '🥣',
+      status: 'Confirmado e em preparo',
+      detail: 'Agora é com a gente: estamos preparando tudo para você.'
+    },
+    preparing: {
+      title: 'Preparando seu pedido 💜',
+      intro: `${customerFirstName}, seu pedido já está sendo preparado com muito carinho.`,
+      subject: `🥣 Pedido ${order.order_number} em preparo`,
+      emoji: '🥣',
+      status: 'Em preparo',
+      detail: 'Assim que sair para entrega, enviaremos um novo aviso.'
+    },
+    out_for_delivery: {
+      title: 'Seu pedido está a caminho! 🛵',
+      intro: `${customerFirstName}, seu pedido saiu para entrega. Fique de olho!`,
+      subject: `🛵 Pedido ${order.order_number} saiu para entrega`,
+      emoji: '🛵',
+      status: 'Saiu para entrega',
+      detail: 'Seu Açaí do Bom está indo até você.'
+    },
+    completed: {
+      title: 'Pedido concluído! 💛',
+      intro: `${customerFirstName}, seu pedido foi concluído. Obrigado por escolher o Açaí do Bom!`,
+      subject: `Pedido ${order.order_number} concluído`,
+      emoji: '💛',
+      status: 'Concluído',
+      detail: 'Esperamos que você aproveite cada colherada!'
+    },
+    cancelled: {
+      title: 'Pedido cancelado',
+      intro: `${customerFirstName}, o pedido ${order.order_number} foi cancelado. Fale conosco se precisar de ajuda.`,
+      subject: `Pedido ${order.order_number} cancelado`,
+      emoji: '⚠️',
+      status: 'Cancelado',
+      detail: 'Se precisar de ajuda, responda esta mensagem.'
+    },
+    payment_paid: {
+      title: 'Pagamento confirmado! ✅',
+      intro: `${customerFirstName}, o pagamento do pedido ${order.order_number} foi confirmado.`,
+      subject: `Pagamento do pedido ${order.order_number} confirmado`,
+      emoji: '✅',
+      status: 'Pagamento aprovado',
+      detail: 'Tudo certo com o pagamento do seu pedido.'
+    },
+    payment_refunded: {
+      title: 'Pagamento estornado',
+      intro: `${customerFirstName}, o pagamento do pedido ${order.order_number} foi marcado como estornado.`,
+      subject: `Pagamento do pedido ${order.order_number} estornado`,
+      emoji: '↩️',
+      status: 'Pagamento estornado',
+      detail: 'Fale conosco caso precise de mais informações.'
+    }
   };
   const message = messages[event] || messages.confirmed;
-  const content = `<div style="background:#fff8c7;border-radius:12px;padding:18px;margin:18px 0"><div style="font-size:13px;color:#5c4058">PEDIDO</div><b style="font-size:20px;color:#620853">${html(order.order_number)}</b><div style="margin-top:8px">Total: <b>${html(money(order.total))}</b></div></div><p style="font-size:14px;color:#5c4058">Você receberá novos avisos conforme o pedido avançar.</p>`;
+  const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:24px 0 18px;background:#fff9d9;border:1px solid #f8e77c;border-radius:18px"><tr><td width="64" style="padding:20px 0 20px 20px;vertical-align:top"><div style="width:48px;height:48px;line-height:48px;text-align:center;background:#620853;border-radius:50%;font-size:24px">${message.emoji}</div></td><td style="padding:20px;vertical-align:middle"><div style="font-size:11px;color:#7a536f;font-weight:700;letter-spacing:.8px;text-transform:uppercase">Status atual</div><div style="font-size:18px;color:#620853;font-weight:700;margin-top:4px">${html(message.status)}</div><div style="font-size:13px;line-height:1.5;color:#684761;margin-top:5px">${html(message.detail)}</div></td></tr></table><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#faf7fb;border:1px solid #eadfea;border-radius:16px"><tr><td style="padding:18px 20px"><div style="font-size:11px;color:#7a536f;font-weight:700;letter-spacing:.8px;text-transform:uppercase">Número do pedido</div><div style="font-size:21px;color:#620853;font-weight:700;margin-top:4px">${html(order.order_number)}</div></td><td style="padding:18px 20px;text-align:right"><div style="font-size:11px;color:#7a536f;font-weight:700;letter-spacing:.8px;text-transform:uppercase">Total</div><div style="font-size:21px;color:#620853;font-weight:700;margin-top:4px;white-space:nowrap">${html(money(order.total))}</div></td></tr></table><p style="font-size:13px;line-height:1.6;color:#74596f;text-align:center;margin:20px 0 0">Você receberá novos avisos conforme o pedido avançar.</p>`;
   return {
     to: customer.email || '',
     replyTo: store.publicEmail || store.orderEmail || '',
     subject: message.subject,
     preheader: message.intro,
-    text: `${message.title}\n\n${message.intro}\n\nPedido: ${order.order_number}\nTotal: ${money(order.total)}\n\n${store.establishmentName || store.storeName || 'Açaí do Bom'}`,
+    text: `${message.title}\n\n${message.intro}\n\nStatus: ${message.status}\n${message.detail}\n\nPedido: ${order.order_number}\nTotal: ${money(order.total)}\n\n${store.establishmentName || store.storeName || 'Açaí do Bom'}`,
     html: emailFrame(message.title, message.intro, content, store)
   };
 }
