@@ -17,7 +17,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#inicio"><span class="brand-mark">A</span><span><b data-store-name>Açaí do Bom</b><small>DELIVERY PRÓPRIO</small></span></a>
+    <a class="brand has-image" href="#inicio"><span class="brand-mark has-logo"><img src="assets/images/logo/logo-acai-do-bom.webp" alt="Açaí do Bom"></span><span><b data-store-name>Açaí do Bom</b><small>DELIVERY PRÓPRIO</small></span></a>
     <nav><a href="#cardapio">Cardápio</a><a href="#entrega">Entrega</a><a id="nav-whatsapp" target="_blank" rel="noopener">Contato</a></nav>
     <button class="cart-toggle" type="button" data-open-cart aria-label="Abrir pedido">🛍 <span>Meu pedido</span><b data-cart-count>0</b></button>
   </header>
@@ -50,7 +50,7 @@
     <section class="whatsapp-callout"><div><i>◉</i><span><small>PREFERE PEDIR DIRETO?</small><b>Fale com a gente no WhatsApp</b></span></div><a id="callout-whatsapp" target="_blank" rel="noopener">CHAMAR AGORA →</a></section>
   </main>
 
-  <footer class="footer"><div class="brand"><span class="brand-mark">A</span><span><b data-store-name>Açaí do Bom</b><small>FEITO COM CAPRICHO</small></span></div><p id="store-address">Ji-Paraná Rondônia</p><div><a href="sistema/admin/">Painel administrativo</a><span>© 2026 Açaí do Bom</span></div></footer>
+  <footer class="footer"><div class="brand has-image"><span class="brand-mark has-logo"><img src="assets/images/logo/logo-acai-do-bom.webp" alt="Açaí do Bom"></span><span><b data-store-name>Açaí do Bom</b><small>FEITO COM CAPRICHO</small></span></div><p id="store-address">Ji-Paraná Rondônia</p><div><a href="sistema/admin/">Painel administrativo</a><span>© 2026 Açaí do Bom</span></div></footer>
 
   <div class="overlay" id="product-overlay" hidden>
     <section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-name">
@@ -76,11 +76,17 @@
       <header class="checkout-head"><button id="checkout-back" aria-label="Voltar">←</button><div><h2>Finalizar pedido</h2><p id="checkout-step-label">Etapa 1 de 3</p></div><span><i id="checkout-progress"></i></span></header>
       <form id="checkout-form">
         <div class="checkout-step" data-step="1">
-          <div class="form-grid"><label class="field full"><span>Seu nome *</span><input name="name" required></label><label class="field"><span>WhatsApp *</span><input name="phone" inputmode="tel" required placeholder="(69) 99999-9999"></label><label class="field"><span>E-mail</span><input name="email" type="email"></label></div>
+          <div class="form-grid">
+            <label class="field full"><span>Seu WhatsApp *</span><input name="phone" inputmode="tel" autocomplete="tel" required placeholder="(69) 99999-9999"></label>
+            <div class="returning-customer full" id="returning-customer" hidden>✓ Encontramos seus dados salvos neste aparelho. Confirme e continue.</div>
+            <label class="field"><span>Seu nome *</span><input name="name" autocomplete="name" required></label>
+            <label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="email"></label>
+            <label class="remember-profile full"><input type="checkbox" name="rememberProfile" value="1"><span><b>Lembrar meus dados neste aparelho</b><small>Na próxima compra, digite apenas seu telefone para preencher o endereço.</small></span></label>
+          </div>
         </div>
         <div class="checkout-step" data-step="2" hidden>
           <div class="fulfillment"><label><input type="radio" name="fulfillment" value="delivery" checked><span>🛵 <b>Receber em casa</b><small>Com taxa de entrega</small></span></label><label><input type="radio" name="fulfillment" value="pickup"><span>🏪 <b>Retirar no local</b><small>Sem taxa de entrega</small></span></label></div>
-          <div class="form-grid" id="address-fields"><label class="field"><span>CEP</span><input name="zip"></label><label class="field"><span>Cidade *</span><input name="city" value="Ji-Paraná - RO"></label><label class="field full"><span>Rua Avenida *</span><input name="street"></label><label class="field"><span>Número *</span><input name="number"></label><label class="field"><span>Complemento</span><input name="complement"></label><label class="field"><span>Bairro *</span><input name="neighborhood"></label><label class="field"><span>Referência</span><input name="reference"></label></div>
+          <div class="form-grid" id="address-fields"><label class="field"><span>CEP</span><input name="zip" autocomplete="postal-code"></label><label class="field"><span>Cidade *</span><input name="city" value="Ji-Paraná - RO" autocomplete="address-level2"></label><label class="field full"><span>Rua ou Avenida *</span><input name="street" autocomplete="street-address"></label><label class="field"><span>Número *</span><input name="number"></label><label class="field"><span>Complemento</span><input name="complement"></label><label class="field"><span>Bairro *</span><input name="neighborhood" autocomplete="address-level3"></label><label class="field"><span>Referência</span><input name="reference"></label></div>
         </div>
         <div class="checkout-step" data-step="3" hidden>
           <h3>Como deseja pagar?</h3><div class="payments" id="payment-options"></div>

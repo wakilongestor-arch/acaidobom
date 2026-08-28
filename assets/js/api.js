@@ -42,10 +42,11 @@
   }
 
   async function createOrder(payload) {
-    const orderNumber = `ADB-${Date.now().toString().slice(-8)}`;
+    const orderNumber = `ADB-${Date.now().toString().slice(-7)}${Math.floor(10 + Math.random() * 90)}`;
     if (window.SupabaseStore?.configured) {
       try {
         await window.SupabaseStore.createOrder(payload, orderNumber);
+        trackOrder(payload, orderNumber);
         return orderResult(orderNumber, payload, true);
       } catch (error) {
         console.error('Pedido não salvo no Supabase.', error);
@@ -62,6 +63,13 @@
     });
     localStorage.setItem('acai_orders', JSON.stringify(orders.slice(0, 30)));
     return orderResult(orderNumber, payload, false);
+  }
+
+  function trackOrder(payload, orderNumber) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ event: 'purchase', transaction_id: orderNumber, value: Number(payload.total || 0), currency: 'BRL' });
+    if (typeof window.fbq === 'function') window.fbq('track', 'Purchase', { value: Number(payload.total || 0), currency: 'BRL' });
+    if (typeof window.gtag === 'function') window.gtag('event', 'purchase', { transaction_id: orderNumber, value: Number(payload.total || 0), currency: 'BRL' });
   }
 
   function money(value) {

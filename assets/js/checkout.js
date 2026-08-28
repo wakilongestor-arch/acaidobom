@@ -2,11 +2,69 @@
   let catalog = null;
   let step = 1;
   let bound = false;
+  let lastRestoredPhone = '';
+  let phoneTimer = null;
+  const profileStorageKey = 'acai_customer_profiles_v1';
   const $ = selector => document.querySelector(selector);
+
+  function normalizePhone(value) {
+    return String(value || '').replace(/\D/g, '').slice(-11);
+  }
+
+  function readProfiles() {
+    try { return JSON.parse(localStorage.getItem(profileStorageKey) || '{}'); }
+    catch (error) { return {}; }
+  }
+
+  function clearRestoredFields() {
+    if (!lastRestoredPhone) return;
+    ['name', 'email', 'zip', 'street', 'number', 'complement', 'neighborhood', 'reference'].forEach(name => {
+      const field = $('#checkout-form').elements.namedItem(name);
+      if (field) field.value = '';
+    });
+    lastRestoredPhone = '';
+  }
+
+  function restoreProfile() {
+    const form = $('#checkout-form');
+    const phone = normalizePhone(form.elements.namedItem('phone').value);
+    const found = $('#returning-customer');
+    if (phone.length < 10) { found.hidden = true; return; }
+    if (lastRestoredPhone && lastRestoredPhone !== phone) clearRestoredFields();
+    const profile = readProfiles()[phone];
+    if (!profile) { found.hidden = true; return; }
+    const values = { ...profile.customer, ...profile.address };
+    Object.entries(values).forEach(([name, value]) => {
+      const field = form.elements.namedItem(name);
+      if (field && name !== 'phone') field.value = value || '';
+    });
+    const fulfillment = form.querySelector(`input[name="fulfillment"][value="${profile.fulfillment || 'delivery'}"]`);
+    if (fulfillment) fulfillment.checked = true;
+    $('#address-fields').hidden = profile.fulfillment === 'pickup';
+    form.elements.namedItem('rememberProfile').checked = true;
+    lastRestoredPhone = phone;
+    found.hidden = false;
+  }
+
+  function saveProfile(payload) {
+    const phone = normalizePhone(payload.customer.phone);
+    if (phone.length < 10) return;
+    const profiles = readProfiles();
+    profiles[phone] = {
+      customer: payload.customer,
+      address: payload.address,
+      fulfillment: payload.fulfillment,
+      updatedAt: new Date().toISOString()
+    };
+    try { localStorage.setItem(profileStorageKey, JSON.stringify(profiles)); }
+    catch (error) { console.warn('Não foi possível lembrar os dados neste aparelho.', error); }
+  }
 
   function open(nextCatalog) {
     catalog = nextCatalog;
     step = 1;
+    lastRestoredPhone = '';
+    $('#returning-customer').hidden = true;
     render();
     $('#checkout-overlay').hidden = false;
     document.body.classList.add('no-scroll');
@@ -116,11 +174,22 @@
       deliveryFee: delivery,
       total: CartStore.subtotal() + delivery
     };
+    let whatsappWindow = null;
+    if (catalog.settings.autoOpenWhatsApp !== false) {
+      whatsappWindow = window.open('', 'acai-pedido-whatsapp');
+      if (whatsappWindow) whatsappWindow.document.title = 'Preparando pedido no WhatsApp';
+    }
     try {
       const result = await MenuAPI.createOrder(payload);
+      if (data.rememberProfile === '1') saveProfile(payload);
       CartStore.clear();
       showSuccess(result, data.name);
+      if (whatsappWindow) {
+        if (result.whatsappUrl) whatsappWindow.location.replace(result.whatsappUrl);
+        else whatsappWindow.close();
+      }
     } catch (error) {
+      whatsappWindow?.close();
       const box = $('#checkout-error');
       box.textContent = error.message || 'Não foi possível concluir o pedido.';
       box.hidden = false;
@@ -135,15 +204,15 @@
     box.hidden = false;
     const title = result.stored ? 'PEDIDO REGISTRADO' : 'PEDIDO PRONTO';
     const message = result.stored
-      ? 'Seu pedido foi salvo. Envie também pelo WhatsApp para confirmação rápida.'
-      : 'Para concluir, envie agora a nota completa pelo WhatsApp.';
+      ? 'Seu pedido foi enviado automaticamente ao painel. O WhatsApp foi aberto com a nota completa para confirmação da loja.'
+      : 'Não foi possível registrar no painel. Envie agora a nota completa pelo WhatsApp.';
     box.innerHTML = `<span class="success-icon">✓</span><small>${title}</small>` +
       `<h2>Obrigado ${String(name).split(' ')[0]}!</h2><p>${message}</p>` +
       `<div class="order-number"><small>NÚMERO DO PEDIDO</small><b>${result.orderNumber}</b></div>` +
       (result.pixKey ? `<div class="pix"><span><small>CHAVE PIX</small><b>${result.pixKey}</b></span><button type="button" data-copy-pix>Copiar</button></div>` : '') +
       '<div class="success-links">' +
       (result.paymentUrl ? `<a href="${result.paymentUrl}" target="_blank" rel="noopener">Pagar on-line</a>` : '') +
-      (result.whatsappUrl ? `<a class="wa" href="${result.whatsappUrl}" target="_blank" rel="noopener">Confirmar pelo WhatsApp</a>` : '') +
+      (result.whatsappUrl ? `<a class="wa" href="${result.whatsappUrl}" target="_blank" rel="noopener">Abrir WhatsApp novamente</a>` : '') +
       (result.emailUrl ? `<a href="${result.emailUrl}">Enviar por e-mail</a>` : '') +
       '</div><button type="button" class="link-button" data-finish>Voltar ao cardápio</button>';
     box.querySelector('[data-copy-pix]')?.addEventListener('click', () => navigator.clipboard.writeText(result.pixKey));
@@ -159,6 +228,12 @@
     $('#checkout-back').addEventListener('click', () => { step = Math.max(1, step - 1); render(); });
     $('#close-checkout').addEventListener('click', close);
     $('#checkout-form').addEventListener('submit', submit);
+    const phone = $('#checkout-form').elements.namedItem('phone');
+    phone.addEventListener('input', () => {
+      clearTimeout(phoneTimer);
+      phoneTimer = setTimeout(restoreProfile, 350);
+    });
+    phone.addEventListener('blur', restoreProfile);
     document.querySelectorAll('input[name=fulfillment]').forEach(input => {
       input.addEventListener('change', () => { $('#address-fields').hidden = input.value === 'pickup'; });
     });

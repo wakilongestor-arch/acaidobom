@@ -7,6 +7,8 @@
   let orders = [];
   let editing = null;
   let deleting = null;
+  let orderRefreshTimer = null;
+  let knownOrderIds = new Set();
 
   async function loadFallbackCatalog() {
     const get = path => fetch(`../../${path}`, { cache: 'no-store' }).then(response => {
@@ -37,9 +39,17 @@
     $('#admin-app').hidden = false;
     try {
       catalog = await SupabaseStore.loadCatalog() || await loadFallbackCatalog();
+      const settings = catalog.settings;
+      if (!settings.logoUrl) settings.logoUrl = 'assets/images/logo/logo-acai-do-bom.webp';
+      if (!settings.primaryColor || settings.primaryColor.toLowerCase() === '#5b1779') settings.primaryColor = '#620853';
+      if (!settings.accentColor || settings.accentColor.toLowerCase() === '#f4c430') settings.accentColor = '#fcd307';
+      settings.brandBrightColor = settings.brandBrightColor || '#be13af';
+      if (typeof settings.autoOpenWhatsApp !== 'boolean') settings.autoOpenWhatsApp = true;
       orders = await SupabaseStore.listOrders();
+      knownOrderIds = new Set(orders.map(order => String(order.id)));
       fill();
       renderAll();
+      startOrderPolling();
     } catch (error) {
       notice(error.message, true);
     }
@@ -75,10 +85,10 @@
     };
     Object.entries(fields).forEach(([selector, key]) => { $(selector).value = settings[key] ?? ''; });
     $('#store-open').checked = Boolean(settings.open);
-    $('#primary-color').value = settings.primaryColor || '#5b1779';
-    $('#primary-text').value = settings.primaryColor || '#5b1779';
-    $('#accent-color').value = settings.accentColor || '#f4c430';
-    $('#accent-text').value = settings.accentColor || '#f4c430';
+    $('#primary-color').value = settings.primaryColor || '#620853';
+    $('#primary-text').value = settings.primaryColor || '#620853';
+    $('#accent-color').value = settings.accentColor || '#fcd307';
+    $('#accent-text').value = settings.accentColor || '#fcd307';
     renderPreviews();
   }
 
@@ -135,9 +145,20 @@
     box.innerHTML = orders.map(order => {
       const items = Array.isArray(order.items) ? order.items : [];
       const customer = order.customer || {};
+      const address = order.address || {};
+      const phone = String(customer.phone || '').replace(/\D/g, '');
+      const itemsHtml = items.map(item => {
+        const additions = (item.selections || []).map(selection => `${esc(selection.groupName)}: ${(selection.options || []).map(option => esc(option.name)).join(', ')}`).join('<br>');
+        return `<div class="order-item"><b>${Number(item.quantity || 1)}x ${esc(item.name)} — ${money(Number(item.unitTotal || 0) * Number(item.quantity || 1))}</b>${additions ? `<small>${additions}</small>` : ''}${item.notes ? `<small>Observação: ${esc(item.notes)}</small>` : ''}</div>`;
+      }).join('');
+      const addressHtml = order.fulfillment === 'delivery'
+        ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.reference ? `<br>Referência: ${esc(address.reference)}` : ''}</div>`
+        : '<div class="order-address"><b>🏪 Retirada no local</b></div>';
       return `<article><header><div><b>${esc(order.order_number)}</b><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
-        `<div class="customer"><span><small>CLIENTE</small>${esc(customer.name)}</span><span><small>WHATSAPP</small>${esc(customer.phone)}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span></div>` +
-        `<p>${items.map(item => `${item.quantity}x ${esc(item.name)}`).join(' · ')}</p>` +
+        `<div class="customer"><span><small>CLIENTE</small>${esc(customer.name)}</span><span><small>WHATSAPP</small>${phone ? `<a href="https://wa.me/55${phone.replace(/^55/,'')}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '-'}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span></div>` +
+        `<div class="order-items">${itemsHtml}</div>${addressHtml}` +
+        `<div class="order-meta"><span>Pagamento: ${esc(order.payment_method)}</span><span>Subtotal: ${money(order.subtotal)}</span><span>Entrega: ${money(order.delivery_fee)}</span></div>` +
+        (order.notes ? `<div class="order-notes"><b>Observações gerais:</b> ${esc(order.notes)}</div>` : '') +
         `<footer><select data-order-status="${esc(order.id)}">${['novo', 'confirmado', 'preparando', 'saiu_entrega', 'concluido', 'cancelado'].map(value => `<option ${order.status === value ? 'selected' : ''} value="${value}">${value.replace('_', ' ')}</option>`).join('')}</select>` +
         `<select data-payment-status="${esc(order.id)}"><option ${order.payment_status === 'pendente' ? 'selected' : ''} value="pendente">Pagamento pendente</option><option ${order.payment_status === 'pago' ? 'selected' : ''} value="pago">Pago</option><option ${order.payment_status === 'estornado' ? 'selected' : ''} value="estornado">Estornado</option></select></footer></article>`;
     }).join('');
@@ -192,6 +213,7 @@
     const settings = catalog.settings;
     $('#logo-preview').innerHTML = settings.logoUrl ? `<img src="${esc(preview(settings.logoUrl))}">` : 'A';
     $('#banner-preview').innerHTML = settings.bannerUrl ? `<img src="${esc(preview(settings.bannerUrl))}">` : '◈';
+    $$('.admin-logo img').forEach(image => { image.src = preview(settings.logoUrl || 'assets/images/logo/logo-acai-do-bom.webp'); });
   }
 
   function openEditor(id) {
@@ -249,7 +271,12 @@
       if (target === 'banner') { catalog.settings.bannerUrl = url; $('#banner-url').value = url; }
       if (target === 'product' && editing) { editing.imageUrl = url; $('#edit-image').value = url; renderProductPhoto(); }
       renderPreviews();
-      notice('Imagem enviada. Clique em publicar alterações.');
+      if (target === 'logo' || target === 'banner') {
+        await SupabaseStore.saveCatalog(catalog);
+        notice('Imagem enviada e publicada no cardápio.');
+      } else {
+        notice('Imagem enviada. Salve o produto e publique as alterações.');
+      }
     } catch (error) {
       notice(error.message, true);
     } finally {
@@ -274,12 +301,27 @@
     }
   }
 
-  async function refreshOrders() {
+  function startOrderPolling() {
+    clearInterval(orderRefreshTimer);
+    orderRefreshTimer = setInterval(() => {
+      if (!document.hidden) refreshOrders(false);
+    }, 8000);
+  }
+
+  async function refreshOrders(showConfirmation = true) {
     try {
-      orders = await SupabaseStore.listOrders();
+      const nextOrders = await SupabaseStore.listOrders();
+      const newOrders = nextOrders.filter(order => !knownOrderIds.has(String(order.id)));
+      orders = nextOrders;
+      knownOrderIds = new Set(orders.map(order => String(order.id)));
       renderDashboard();
       renderOrders();
-      notice('Pedidos atualizados.');
+      if (newOrders.length) {
+        notice(newOrders.length === 1 ? 'Novo pedido recebido!' : `${newOrders.length} novos pedidos recebidos!`);
+        document.title = `(${newOrders.length}) Novo pedido | Açaí do Bom`;
+      } else if (showConfirmation === true) {
+        notice('Pedidos atualizados.');
+      }
     } catch (error) {
       notice(error.message, true);
     }
@@ -302,15 +344,16 @@
         button.textContent = 'Entrar com segurança';
       }
     });
-    $('#logout').onclick = async event => { event.preventDefault(); await SupabaseStore.signOut(); location.reload(); };
+    $('#logout').onclick = async event => { event.preventDefault(); clearInterval(orderRefreshTimer); await SupabaseStore.signOut(); location.reload(); };
     $$('[data-tab]').forEach(button => {
       button.onclick = () => {
         $$('[data-tab]').forEach(item => item.classList.toggle('active', item === button));
         $$('[data-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === button.dataset.tab));
+        if (button.dataset.tab === 'orders') { document.title = 'Pedidos | Açaí do Bom'; refreshOrders(false); }
       };
     });
     $('#save-all').onclick = saveAll;
-    $('#refresh-orders').onclick = refreshOrders;
+    $('#refresh-orders').onclick = () => refreshOrders(true);
     $('#new-product').onclick = () => openEditor();
     $$('[data-close-product]').forEach(button => { button.onclick = () => { $('#product-dialog').hidden = true; }; });
     $('#product-form').onsubmit = event => {

@@ -4,12 +4,31 @@
   let catalog,active='destaques',query='',selected=null,selections={},quantity=1;
   try{ catalog=await MenuAPI.loadCatalog(); window.ACAI_CATALOG=catalog; boot(); }catch(e){ $('#products').innerHTML='<div class="empty"><h3>Cardápio indisponível</h3><p>Tente novamente em alguns minutos.</p></div>'; }
   function boot(){
-    const s=catalog.settings; document.documentElement.style.setProperty('--brand',s.primaryColor); document.documentElement.style.setProperty('--accent',s.accentColor);
+    const s=catalog.settings;
+    if(!s.logoUrl) s.logoUrl='assets/images/logo/logo-acai-do-bom.webp';
+    if(!s.primaryColor||s.primaryColor.toLowerCase()==='#5b1779') s.primaryColor='#620853';
+    if(!s.accentColor||s.accentColor.toLowerCase()==='#f4c430') s.accentColor='#fcd307';
+    s.brandBrightColor=s.brandBrightColor||'#be13af';
+    document.documentElement.style.setProperty('--brand',s.primaryColor);
+    document.documentElement.style.setProperty('--accent',s.accentColor);
+    document.documentElement.style.setProperty('--brand-bright',s.brandBrightColor);
+    renderLogo(s.logoUrl,s.storeName);
     $$('[data-store-name]').forEach(el=>el.textContent=s.storeName); $('#store-tagline').textContent=s.tagline; $('#store-city').textContent=s.city; $('#store-time').textContent=s.estimatedTime; $('#store-fee').textContent=MenuAPI.money(s.deliveryFee); $('#store-address').textContent=s.address;
     $('#hero-image').src=s.bannerUrl; const wa='https://wa.me/'+String(s.whatsapp).replace(/\D/g,''); $('#nav-whatsapp').href=wa; $('#callout-whatsapp').href=wa;
     $('#store-status').textContent=s.open?'● Aberto agora':'● Fechado no momento'; $('#store-status').classList.toggle('closed',!s.open);
     $('#minimum-order').textContent='Pedido mínimo para entrega: '+MenuAPI.money(s.minOrder);
     MenuAPI.injectTracking(s); renderCategories(); renderProducts(); bind(); CartStore.subscribe(renderCart);
+  }
+  function renderLogo(url,name){
+    $$('.brand-mark').forEach(mark=>{
+      const image=document.createElement('img');
+      image.src=url;
+      image.alt=name||'Açaí do Bom';
+      image.addEventListener('error',()=>{ mark.classList.remove('has-logo'); mark.textContent='A'; mark.closest('.brand')?.classList.remove('has-image'); },{once:true});
+      mark.replaceChildren(image);
+      mark.classList.add('has-logo');
+      mark.closest('.brand')?.classList.add('has-image');
+    });
   }
   function renderCategories(){
     $('#categories').innerHTML=catalog.categories.filter(c=>c.active).map(c=>'<button data-category="'+escape(c.id)+'" class="'+(c.id===active?'active':'')+'"><span>'+escape(c.emoji)+'</span>'+escape(c.name)+'</button>').join('');

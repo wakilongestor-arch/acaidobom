@@ -1,7 +1,7 @@
 {
   "storeName": "Açaí do Bom",
   "tagline": "Seu açaí do seu jeito rápido e caprichado",
-  "logoUrl": "",
+  "logoUrl": "assets/images/logo/logo-acai-do-bom.webp",
   "bannerUrl": "https://images.pexels.com/photos/14167805/pexels-photo-14167805.jpeg?auto=compress&cs=tinysrgb&w=1600",
   "whatsapp": "5569999999999",
   "orderEmail": "pedidos@acaidobom.com.br",
@@ -13,8 +13,10 @@
   "open": true,
   "pixKey": "",
   "paymentLink": "",
-  "primaryColor": "#5b1779",
-  "accentColor": "#f4c430",
+  "primaryColor": "#620853",
+  "accentColor": "#fcd307",
+  "brandBrightColor": "#be13af",
+  "autoOpenWhatsApp": true,
   "metaPixelId": "",
   "gtmId": "",
   "ga4Id": ""
