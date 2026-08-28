@@ -37,6 +37,14 @@
     settings.accentColor = '#fcd307';
     settings.brandBrightColor = '#620853';
     settings.timezone = settings.timezone || 'America/Porto_Velho';
+    settings.establishmentName = settings.establishmentName || settings.storeName || 'Açaí do Bom';
+    settings.locationName = settings.locationName || settings.city || 'Ji-Paraná - RO';
+    settings.contactPhone = settings.contactPhone || '(69) 9381-7951';
+    settings.publicEmail = settings.publicEmail || 'contato@acaidobom.com.br';
+    settings.cnpj = settings.cnpj || '';
+    settings.instagramUrl = settings.instagramUrl || '';
+    settings.facebookUrl = settings.facebookUrl || '';
+    settings.tiktokUrl = settings.tiktokUrl || '';
     if (!['auto', 'open', 'closed'].includes(settings.statusMode)) {
       settings.statusMode = settings.open === false ? 'closed' : 'open';
     }
@@ -58,11 +66,13 @@
     $('#store-city').textContent = settings.city;
     $('#store-time').textContent = settings.estimatedTime;
     $('#store-fee').textContent = MenuAPI.money(settings.deliveryFee);
-    $('#store-address').textContent = settings.address;
+    const addressNode = $('#store-address');
+    if (addressNode) addressNode.textContent = settings.address;
     $('#hero-image').src = settings.bannerUrl;
     const whatsapp = 'https://wa.me/' + String(settings.whatsapp).replace(/\D/g, '');
     $('#nav-whatsapp').href = whatsapp;
     $('#callout-whatsapp').href = whatsapp;
+    renderFooter(settings);
     MenuAPI.injectTracking(settings);
     renderCategories();
     renderProducts();
@@ -70,6 +80,39 @@
     CartStore.subscribe(renderCart);
     refreshStoreStatus();
     statusTimer = window.setInterval(refreshStoreStatus, 60000);
+  }
+
+  function safeLink(value) {
+    try {
+      const url = new URL(String(value || ''));
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function renderFooter(settings) {
+    $('#footer-establishment').textContent = settings.establishmentName;
+    $('#footer-location').textContent = settings.locationName;
+    const cnpj = $('#footer-cnpj');
+    cnpj.textContent = settings.cnpj ? 'CNPJ: ' + settings.cnpj : '';
+    cnpj.hidden = !settings.cnpj;
+    const phone = $('#footer-phone');
+    phone.textContent = settings.contactPhone;
+    const phoneDigits = String(settings.contactPhone).replace(/\D/g, '');
+    phone.href = 'tel:+' + (phoneDigits.startsWith('55') ? phoneDigits : '55' + phoneDigits);
+    const email = $('#footer-email');
+    email.textContent = settings.publicEmail;
+    email.href = 'mailto:' + settings.publicEmail;
+    const social = [
+      ['instagramUrl', 'Instagram', '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" class="fill"/></svg>'],
+      ['facebookUrl', 'Facebook', '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M14 8h3V4h-3c-3.3 0-5 2-5 5v2H6v4h3v7h4v-7h3.3l.7-4h-4V9c0-.7.3-1 1-1Z"/></svg>'],
+      ['tiktokUrl', 'TikTok', '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M14 3h3c.3 2 1.5 3.5 4 4v3c-1.5 0-2.8-.4-4-1.1V16a6 6 0 1 1-6-6h1v3a3 3 0 1 0 2 3V3Z"/></svg>']
+    ];
+    $('#footer-social').innerHTML = social.map(([key, name, icon]) => {
+      const url = safeLink(settings[key]);
+      return url ? '<a href="' + escape(url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + name + '" title="' + name + '">' + icon + '</a>' : '';
+    }).join('');
   }
 
   function renderLogo(url, name) {
@@ -321,8 +364,8 @@
 
   function calculateStoreState(settings = catalog.settings) {
     const mode = settings.statusMode || (settings.open === false ? 'closed' : 'open');
-    if (mode === 'open') return { open: true, text: '● Aberto agora', mode };
-    if (mode === 'closed') return { open: false, text: '● Fechado no momento', mode };
+    if (mode === 'open') return { open: true, text: 'Aberto e recebendo pedidos', mode };
+    if (mode === 'closed') return { open: false, text: 'Fechado no momento', mode };
     const hours = settings.hours || {};
     const now = zonedNow(settings);
     const current = hours[dayKeys[now.day]];
@@ -339,7 +382,7 @@
     if (!closing && previous?.enabled && minutes(previous.close) <= minutes(previous.open) && now.minute < minutes(previous.close)) {
       closing = previous.close;
     }
-    if (closing) return { open: true, text: '● Aberto agora · até ' + closing, mode };
+    if (closing) return { open: true, text: 'Aberto agora · até ' + closing, mode };
 
     let nextText = '';
     for (let offset = 0; offset < 7; offset += 1) {
@@ -351,7 +394,7 @@
       else if (offset > 1) nextText = ' · abre ' + weekLabels[index] + ' às ' + schedule.open;
       if (nextText) break;
     }
-    return { open: false, text: '● Fechado agora' + nextText, mode };
+    return { open: false, text: 'Fechado agora' + nextText, mode };
   }
 
   function applyStoreStateToCheckout() {
@@ -363,7 +406,7 @@
     button.textContent = state.open ? 'Finalizar pedido →' : 'Loja fechada';
     $('#minimum-order').textContent = state.open
       ? 'Pedido mínimo para entrega: ' + MenuAPI.money(catalog.settings.minOrder)
-      : state.text.replace('● ', '');
+      : state.text;
   }
 
   function refreshStoreStatus() {
@@ -437,4 +480,3 @@
   window.syncMenuScroll = syncBodyLock;
   window.MenuStoreStatus = { get: () => calculateStoreState(), refresh: refreshStoreStatus };
 })();
-

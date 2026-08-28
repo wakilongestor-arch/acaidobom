@@ -9,6 +9,7 @@
   let deleting = null;
   let orderRefreshTimer = null;
   let knownOrderIds = new Set();
+  let orderView = 'board';
   const weekDays = [
     ['sun', 'Domingo'], ['mon', 'Segunda'], ['tue', 'Terça'], ['wed', 'Quarta'],
     ['thu', 'Quinta'], ['fri', 'Sexta'], ['sat', 'Sábado']
@@ -88,6 +89,17 @@
       if (settings[key] !== value) { settings[key] = value; changed = true; }
     };
     if (!settings.logoUrl) set('logoUrl', 'assets/images/logo/logo-acai-do-bom.webp');
+    if (!settings.establishmentName) set('establishmentName', settings.storeName || 'Açaí do Bom');
+    if (!settings.locationName) set('locationName', settings.city || 'Ji-Paraná - RO');
+    if (!settings.contactPhone) set('contactPhone', '(69) 9381-7951');
+    if (!settings.publicEmail) set('publicEmail', 'contato@acaidobom.com.br');
+    if (typeof settings.cnpj !== 'string') set('cnpj', '');
+    if (typeof settings.instagramUrl !== 'string') set('instagramUrl', '');
+    if (typeof settings.facebookUrl !== 'string') set('facebookUrl', '');
+    if (typeof settings.tiktokUrl !== 'string') set('tiktokUrl', '');
+    if (typeof settings.whatsappCloudEnabled !== 'boolean') set('whatsappCloudEnabled', false);
+    if (typeof settings.gatewayEnabled !== 'boolean') set('gatewayEnabled', false);
+    if (!settings.gatewayProvider) set('gatewayProvider', 'none');
     set('primaryColor', '#620853');
     set('accentColor', '#fcd307');
     set('brandBrightColor', '#620853');
@@ -124,9 +136,15 @@
       '#estimated-time': 'estimatedTime', '#store-whatsapp': 'whatsapp',
       '#order-email': 'orderEmail', '#pix-key': 'pixKey', '#payment-link': 'paymentLink',
       '#meta-pixel': 'metaPixelId', '#gtm-id': 'gtmId', '#ga4-id': 'ga4Id',
-      '#delivery-fee': 'deliveryFee', '#min-order': 'minOrder'
+      '#delivery-fee': 'deliveryFee', '#min-order': 'minOrder',
+      '#establishment-name': 'establishmentName', '#location-name': 'locationName',
+      '#store-cnpj': 'cnpj', '#contact-phone': 'contactPhone', '#public-email': 'publicEmail',
+      '#instagram-url': 'instagramUrl', '#facebook-url': 'facebookUrl', '#tiktok-url': 'tiktokUrl',
+      '#gateway-provider': 'gatewayProvider'
     };
     Object.entries(fields).forEach(([selector, key]) => { $(selector).value = settings[key] ?? ''; });
+    $('#whatsapp-cloud-enabled').checked = Boolean(settings.whatsappCloudEnabled);
+    $('#gateway-enabled').checked = Boolean(settings.gatewayEnabled);
     $('#store-status-mode').value = settings.statusMode || 'open';
     renderHoursEditor();
     renderPreviews();
@@ -139,7 +157,11 @@
       '#store-tagline': 'tagline', '#store-city': 'city', '#store-address': 'address',
       '#estimated-time': 'estimatedTime', '#store-whatsapp': 'whatsapp',
       '#order-email': 'orderEmail', '#pix-key': 'pixKey', '#payment-link': 'paymentLink',
-      '#meta-pixel': 'metaPixelId', '#gtm-id': 'gtmId', '#ga4-id': 'ga4Id'
+      '#meta-pixel': 'metaPixelId', '#gtm-id': 'gtmId', '#ga4-id': 'ga4Id',
+      '#establishment-name': 'establishmentName', '#location-name': 'locationName',
+      '#store-cnpj': 'cnpj', '#contact-phone': 'contactPhone', '#public-email': 'publicEmail',
+      '#instagram-url': 'instagramUrl', '#facebook-url': 'facebookUrl', '#tiktok-url': 'tiktokUrl',
+      '#gateway-provider': 'gatewayProvider'
     };
     Object.entries(fields).forEach(([selector, key]) => { settings[key] = $(selector).value.trim(); });
     settings.deliveryFee = Number($('#delivery-fee').value);
@@ -149,6 +171,8 @@
     settings.primaryColor = '#620853';
     settings.accentColor = '#fcd307';
     settings.brandBrightColor = '#620853';
+    settings.whatsappCloudEnabled = $('#whatsapp-cloud-enabled').checked;
+    settings.gatewayEnabled = $('#gateway-enabled').checked;
     collectHours();
   }
 
@@ -281,6 +305,7 @@
     if (order.fulfillment === 'delivery') {
       lines.push('', 'ENDEREÇO DE ENTREGA', `${address.street || ''}, ${address.number || ''}${address.complement ? ` — ${address.complement}` : ''}`, `${address.neighborhood || ''} — ${address.city || ''}${address.zip ? ` — CEP ${address.zip}` : ''}`);
       if (address.reference) lines.push(`Referência: ${address.reference}`);
+      if (address.mapUrl) lines.push(`Mapa: ${address.mapUrl}`);
     } else {
       lines.push('', 'RETIRADA NO LOCAL');
     }
@@ -307,19 +332,22 @@
         }).join('');
         return `<div class="order-item"><b>${Number(item.quantity || 1)}x ${esc(item.name)}</b><strong>${money(Number(item.unitTotal || 0) * Number(item.quantity || 1))}</strong>${additions}${item.notes ? `<small><b>Observação:</b> ${esc(item.notes)}</small>` : ''}</div>`;
       }).join('');
+      const mapUrl = /^https:\/\/www\.google\.com\/maps\//.test(address.mapUrl || '') ? address.mapUrl : '';
       const addressHtml = order.fulfillment === 'delivery'
-        ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.reference ? `<br><b>Referência:</b> ${esc(address.reference)}` : ''}</div>`
+        ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.reference ? `<br><b>Referência:</b> ${esc(address.reference)}` : ''}${mapUrl ? `<br><a class="map-link" href="${esc(mapUrl)}" target="_blank" rel="noopener">Abrir localização no mapa</a>` : ''}</div>`
         : '<div class="order-address"><b>🏪 Retirada no local</b><br>Cliente buscará o pedido na loja.</div>';
-      return `<article class="order-ticket status-${esc(order.status)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
+      const paymentClass = order.payment_status === 'pago' ? 'paid' : order.payment_status === 'estornado' ? 'refunded' : 'pending';
+      return `<article class="order-ticket status-${esc(order.status)}" data-order-card="${esc(order.id)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
         `<div class="customer"><span><small>CLIENTE</small><b>${esc(customer.name)}</b></span><span><small>WHATSAPP</small>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '-'}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span>${customer.email ? `<span><small>E-MAIL</small>${esc(customer.email)}</span>` : ''}</div>` +
         `<h4 class="order-section-title">ITENS DO PEDIDO</h4><div class="order-items">${itemsHtml}</div>${addressHtml}` +
-        `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span><span>${order.payment_status === 'pago' ? 'Pagamento confirmado' : 'Pagamento pendente'}</span></div>` +
+        `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span><span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span></div>` +
         (order.notes ? `<div class="order-notes"><b>Observações gerais:</b> ${esc(order.notes)}</div>` : '') +
         `<div class="order-totals"><div><span>Subtotal</span><b>${money(order.subtotal)}</b></div><div><span>Taxa de entrega</span><b>${money(order.delivery_fee)}</b></div><div class="grand-total"><span>TOTAL</span><b>${money(order.total)}</b></div></div>` +
-        `<footer class="order-footer"><div class="order-actions"><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}<button type="button" class="confirm-order" data-fast-status="confirmado" data-order-id="${esc(order.id)}">✓ Confirmar pedido</button><button type="button" class="cancel-order" data-fast-status="cancelado" data-order-id="${esc(order.id)}">Cancelar pedido</button></div>` +
+        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">Ver nota completa</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}<button type="button" class="confirm-order" data-fast-status="confirmado" data-order-id="${esc(order.id)}">✓ Confirmar pedido</button><button type="button" class="cancel-order" data-fast-status="cancelado" data-order-id="${esc(order.id)}">Cancelar pedido</button></div>` +
         `<div class="order-selects"><select aria-label="Status do pedido" data-order-status="${esc(order.id)}">${['novo', 'confirmado', 'preparando', 'saiu_entrega', 'concluido', 'cancelado'].map(value => `<option ${order.status === value ? 'selected' : ''} value="${value}">${statusLabel(value)}</option>`).join('')}</select>` +
         `<select aria-label="Status do pagamento" data-payment-status="${esc(order.id)}"><option ${order.payment_status === 'pendente' ? 'selected' : ''} value="pendente">Pagamento pendente</option><option ${order.payment_status === 'pago' ? 'selected' : ''} value="pago">Pagamento pago</option><option ${order.payment_status === 'estornado' ? 'selected' : ''} value="estornado">Pagamento estornado</option></select></div></footer></article>`;
     }).join('');
+    organizeOrdersView(box);
     box.querySelectorAll('select').forEach(select => {
       select.addEventListener('change', () => updateOrder(select.dataset.orderStatus || select.dataset.paymentStatus));
     });
@@ -338,6 +366,36 @@
         }
       });
     });
+    box.querySelectorAll('[data-toggle-order]').forEach(button => {
+      button.addEventListener('click', () => {
+        const card = button.closest('[data-order-card]');
+        const expanded = card.classList.toggle('expanded');
+        button.textContent = expanded ? 'Recolher nota' : 'Ver nota completa';
+      });
+    });
+  }
+
+  function organizeOrdersView(box) {
+    const cards = [...box.querySelectorAll('[data-order-card]')];
+    if (orderView === 'list') {
+      box.className = 'orders orders-list-view';
+      return;
+    }
+    box.className = 'orders orders-board';
+    const stages = [
+      ['novo', 'Novos'], ['confirmado', 'Confirmados'], ['preparando', 'Em preparo'],
+      ['saiu_entrega', 'Em entrega'], ['concluido', 'Concluídos'], ['cancelado', 'Cancelados']
+    ];
+    const fragment = document.createDocumentFragment();
+    stages.forEach(([status, label]) => {
+      const stageCards = cards.filter(card => card.classList.contains(`status-${status}`));
+      const column = document.createElement('section');
+      column.className = `order-column column-${status}`;
+      column.innerHTML = `<header><b>${label}</b><span>${stageCards.length}</span></header><div class="order-column-body"></div>`;
+      stageCards.forEach(card => column.querySelector('.order-column-body').appendChild(card));
+      fragment.appendChild(column);
+    });
+    box.replaceChildren(fragment);
   }
 
   async function updateOrder(id, forcedStatus = '') {
@@ -571,6 +629,18 @@
     });
     $('#save-all').onclick = saveAll;
     $('#refresh-orders').onclick = () => refreshOrders(true);
+    $('#order-board-view').onclick = () => {
+      orderView = 'board';
+      $('#order-board-view').classList.add('active');
+      $('#order-list-view').classList.remove('active');
+      renderOrders();
+    };
+    $('#order-list-view').onclick = () => {
+      orderView = 'list';
+      $('#order-list-view').classList.add('active');
+      $('#order-board-view').classList.remove('active');
+      renderOrders();
+    };
     $('#new-product').onclick = () => openEditor();
     $$('[data-close-product]').forEach(button => { button.onclick = closeEditor; });
     $('#product-form').onsubmit = async event => {

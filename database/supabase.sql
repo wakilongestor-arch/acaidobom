@@ -106,3 +106,12 @@ create policy "administrador remove imagens"
 -- Segurança importante:
 -- Em Authentication > Providers > Email, desative novos cadastros públicos.
 -- Crie somente o usuário administrador pelo painel do Supabase.
+
+-- Campos opcionais para integrações protegidas (seguro executar novamente).
+alter table public.orders add column if not exists notification_status text not null default 'nao_enviado';
+alter table public.orders add column if not exists notification_error text not null default '';
+alter table public.orders add column if not exists notified_at timestamptz;
+alter table public.orders add column if not exists payment_provider text not null default '';
+alter table public.orders add column if not exists payment_reference text not null default '';
+alter table public.orders add column if not exists checkout_url text not null default '';
+

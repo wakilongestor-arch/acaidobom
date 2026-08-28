@@ -25,7 +25,7 @@
     return loadStaticCatalog();
   }
 
-  function orderResult(orderNumber, payload, stored) {
+  function orderResult(orderNumber, payload, stored, extra = {}) {
     const note = buildNote(orderNumber, payload);
     const settings = window.ACAI_CATALOG?.settings || {};
     const phone = String(settings.whatsapp || '').replace(/\D/g, '');
@@ -37,7 +37,9 @@
       whatsappUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(note)}` : '',
       emailUrl: email ? `mailto:${email}?subject=${encodeURIComponent(`Pedido ${orderNumber}`)}&body=${encodeURIComponent(note)}` : '',
       pixKey: settings.pixKey || '',
-      paymentUrl: payload.paymentMethod === 'payment_link' ? (settings.paymentLink || '') : ''
+      paymentUrl: extra.paymentUrl || (payload.paymentMethod === 'payment_link' ? (settings.paymentLink || '') : ''),
+      notificationSent: Boolean(extra.notificationSent),
+      notificationError: extra.notificationError || ''
     };
   }
 
@@ -45,9 +47,30 @@
     const orderNumber = `ADB-${Date.now().toString().slice(-7)}${Math.floor(10 + Math.random() * 90)}`;
     if (window.SupabaseStore?.configured) {
       try {
-        await window.SupabaseStore.createOrder(payload, orderNumber);
+        const saved = await window.SupabaseStore.createOrder(payload, orderNumber);
         trackOrder(payload, orderNumber);
-        return orderResult(orderNumber, payload, true);
+        const settings = window.ACAI_CATALOG?.settings || {};
+        let notificationSent = false;
+        let notificationError = '';
+        let paymentUrl = '';
+        if (settings.whatsappCloudEnabled && saved?.id) {
+          try {
+            const notification = await window.SupabaseStore.notifyOrder(saved.id);
+            notificationSent = notification.sent === true;
+          } catch (error) {
+            notificationError = error.message;
+            console.error('Pedido salvo; falha no WhatsApp Cloud API.', error);
+          }
+        }
+        if (payload.paymentMethod === 'payment_link' && settings.gatewayEnabled && settings.gatewayProvider !== 'none' && saved?.id) {
+          try {
+            const checkout = await window.SupabaseStore.createCheckout(saved.id, settings.gatewayProvider);
+            paymentUrl = checkout.checkoutUrl || '';
+          } catch (error) {
+            console.error('Pedido salvo; falha ao criar checkout.', error);
+          }
+        }
+        return orderResult(orderNumber, payload, true, { notificationSent, notificationError, paymentUrl });
       } catch (error) {
         console.error('Pedido não salvo no Supabase.', error);
       }
@@ -122,6 +145,7 @@
         `${address.neighborhood} — ${address.city}${address.zip ? ` — CEP ${address.zip}` : ''}`
       );
       if (address.reference) lines.push(`Referência: ${address.reference}`);
+      if (address.mapUrl) lines.push(`Mapa: ${address.mapUrl}`);
     } else {
       lines.push('', '🏪 Retirada no local');
     }

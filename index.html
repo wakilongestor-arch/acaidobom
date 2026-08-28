@@ -30,7 +30,7 @@
         <p>✦ DO SEU JEITO</p>
         <h1>O açaí que<br><em>dá vontade.</em></h1>
         <span id="store-tagline">Seu açaí do seu jeito, rápido e caprichado</span>
-        <div><a class="cta" href="#cardapio">VER CARDÁPIO →</a><span class="open-status" id="store-status">● Aberto agora</span></div>
+        <div><a class="cta" href="#cardapio">VER CARDÁPIO →</a><span class="open-status" id="store-status">Aberto agora</span></div>
       </div>
     </section>
 
@@ -50,7 +50,14 @@
     <section class="whatsapp-callout"><div><i>◉</i><span><small>PREFERE PEDIR DIRETO?</small><b>Fale com a gente no WhatsApp</b></span></div><a id="callout-whatsapp" target="_blank" rel="noopener">CHAMAR AGORA →</a></section>
   </main>
 
-  <footer class="footer"><div class="brand has-image"><span class="brand-mark has-logo"><img src="assets/images/logo/logo-acai-do-bom.webp" alt="Açaí do Bom"></span><span><b data-store-name>Açaí do Bom</b><small>FEITO COM CAPRICHO</small></span></div><p id="store-address">Ji-Paraná Rondônia</p><div><a href="sistema/admin/">Painel administrativo</a><span>© 2026 Açaí do Bom</span></div></footer>
+  <footer class="footer">
+    <div class="footer-main">
+      <div class="brand has-image"><span class="brand-mark has-logo"><img src="assets/images/logo/logo-acai-do-bom.webp" alt="Açaí do Bom"></span><span><b data-store-name>Açaí do Bom</b><small>FEITO COM CAPRICHO</small></span></div>
+      <div class="footer-business"><b id="footer-establishment">Açaí do Bom</b><span id="footer-location">Ji-Paraná - RO</span><span id="footer-cnpj" hidden></span><a id="footer-phone" href="tel:+556993817951">(69) 9381-7951</a><a id="footer-email" href="mailto:contato@acaidobom.com.br">contato@acaidobom.com.br</a></div>
+      <div class="footer-social" id="footer-social" aria-label="Redes sociais"></div>
+    </div>
+    <div class="footer-bottom"><nav><a href="politicas.html#privacidade">Privacidade</a><a href="politicas.html#termos">Termos de uso</a><a href="politicas.html#reembolso">Reembolso e cancelamento</a><a href="politicas.html#cookies">Cookies</a></nav><span>© 2026 Açaí do Bom</span></div>
+  </footer>
 
   <div class="overlay" id="product-overlay" hidden>
     <section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-name">
@@ -81,12 +88,12 @@
             <div class="returning-customer full" id="returning-customer" hidden>✓ Encontramos seus dados salvos neste aparelho. Confirme e continue.</div>
             <label class="field"><span>Seu nome *</span><input name="name" autocomplete="name" required></label>
             <label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="email"></label>
-            <label class="remember-profile full"><input type="checkbox" name="rememberProfile" value="1"><span><b>Lembrar meus dados neste aparelho</b><small>Na próxima compra, digite apenas seu telefone para preencher o endereço.</small></span></label>
+            <label class="remember-profile full"><input type="checkbox" name="rememberProfile" value="1"><span><b>Lembrar meus dados neste aparelho</b><small>Na próxima compra, digite apenas seu telefone para preencher o endereço.</small></span></label><p class="privacy-consent full">Ao continuar, você concorda com os <a href="politicas.html#termos" target="_blank">Termos de uso</a> e a <a href="politicas.html#privacidade" target="_blank">Política de privacidade</a>.</p>
           </div>
         </div>
         <div class="checkout-step" data-step="2" hidden>
           <div class="fulfillment"><label><input type="radio" name="fulfillment" value="delivery" checked><span>🛵 <b>Receber em casa</b><small>Com taxa de entrega</small></span></label><label><input type="radio" name="fulfillment" value="pickup"><span>🏪 <b>Retirar no local</b><small>Sem taxa de entrega</small></span></label></div>
-          <div class="form-grid" id="address-fields"><label class="field"><span>CEP</span><input name="zip" autocomplete="postal-code"></label><label class="field"><span>Cidade *</span><input name="city" value="Ji-Paraná - RO" autocomplete="address-level2"></label><label class="field full"><span>Rua ou Avenida *</span><input name="street" autocomplete="street-address"></label><label class="field"><span>Número *</span><input name="number"></label><label class="field"><span>Complemento</span><input name="complement"></label><label class="field"><span>Bairro *</span><input name="neighborhood" autocomplete="address-level3"></label><label class="field"><span>Referência</span><input name="reference"></label></div>
+          <div class="form-grid" id="address-fields"><label class="field"><span>CEP</span><input name="zip" autocomplete="postal-code"></label><label class="field"><span>Cidade *</span><input name="city" value="Ji-Paraná - RO" autocomplete="address-level2"></label><label class="field full"><span>Rua ou Avenida *</span><input name="street" autocomplete="street-address"></label><label class="field"><span>Número *</span><input name="number"></label><label class="field"><span>Complemento</span><input name="complement"></label><label class="field"><span>Bairro *</span><input name="neighborhood" autocomplete="address-level3"></label><label class="field"><span>Referência</span><input name="reference"></label><div class="location-assist full"><button type="button" id="use-location">⌖ Marcar minha localização atual</button><span id="location-status">Opcional: facilita encontrar o endereço na entrega.</span><input type="hidden" name="latitude"><input type="hidden" name="longitude"></div></div>
         </div>
         <div class="checkout-step" data-step="3" hidden>
           <h3>Como deseja pagar?</h3><div class="payments" id="payment-options"></div>

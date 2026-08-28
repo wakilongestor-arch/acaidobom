@@ -18,11 +18,12 @@
 
   function clearRestoredFields() {
     if (!lastRestoredPhone) return;
-    ['name', 'email', 'zip', 'street', 'number', 'complement', 'neighborhood', 'reference'].forEach(name => {
+    ['name', 'email', 'zip', 'street', 'number', 'complement', 'neighborhood', 'reference', 'latitude', 'longitude'].forEach(name => {
       const field = $('#checkout-form').elements.namedItem(name);
       if (field) field.value = '';
     });
     lastRestoredPhone = '';
+    resetLocationStatus();
   }
 
   function restoreProfile() {
@@ -44,6 +45,9 @@
     form.elements.namedItem('rememberProfile').checked = true;
     lastRestoredPhone = phone;
     found.hidden = false;
+    if (profile.address?.latitude && profile.address?.longitude) {
+      showLocationStatus('Localização salva recuperada para esta entrega.', true);
+    }
   }
 
   function saveProfile(payload) {
@@ -66,6 +70,7 @@
     step = 1;
     lastRestoredPhone = '';
     $('#returning-customer').hidden = true;
+    resetLocationStatus();
     render();
     $('#checkout-overlay').hidden = false;
     window.syncMenuScroll?.();
@@ -80,7 +85,46 @@
     $('#checkout-form').hidden = false;
     $('#checkout-form').reset();
     step = 1;
+    resetLocationStatus();
     render();
+  }
+
+  function showLocationStatus(message, success = false) {
+    const box = document.querySelector('.location-assist');
+    const status = $('#location-status');
+    if (status) status.textContent = message;
+    box?.classList.toggle('success', success);
+  }
+
+  function resetLocationStatus() {
+    showLocationStatus('Opcional: facilita encontrar o endereço na entrega.', false);
+    const button = $('#use-location');
+    if (button) {
+      button.disabled = false;
+      button.textContent = '⌖ Marcar minha localização atual';
+    }
+  }
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      showLocationStatus('Este navegador não permite marcar localização.');
+      return;
+    }
+    const button = $('#use-location');
+    button.disabled = true;
+    button.textContent = 'Localizando...';
+    navigator.geolocation.getCurrentPosition(position => {
+      const form = $('#checkout-form');
+      form.elements.namedItem('latitude').value = position.coords.latitude.toFixed(6);
+      form.elements.namedItem('longitude').value = position.coords.longitude.toFixed(6);
+      showLocationStatus('Localização marcada. Complete rua, número e bairro.', true);
+      button.disabled = false;
+      button.textContent = '✓ Localização marcada';
+    }, () => {
+      showLocationStatus('Não foi possível acessar a localização. Você pode preencher o endereço normalmente.');
+      button.disabled = false;
+      button.textContent = '⌖ Marcar minha localização atual';
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
   }
 
   function render() {
@@ -127,7 +171,9 @@
       ['card_delivery', 'Cartão na entrega', 'Crédito ou débito'],
       ['cash', 'Dinheiro', 'Informe se precisa de troco']
     ];
-    if (catalog.settings.paymentLink) methods.push(['payment_link', 'Pagamento on-line', 'Link seguro']);
+    if (catalog.settings.paymentLink || (catalog.settings.gatewayEnabled && catalog.settings.gatewayProvider !== 'none')) {
+      methods.push(['payment_link', 'Pagamento on-line', 'Link seguro']);
+    }
     const current = document.querySelector('input[name=paymentMethod]:checked')?.value || 'pix';
     $('#payment-options').innerHTML = methods.map(([value, label, description]) =>
       `<label><input type="radio" name="paymentMethod" value="${value}" ${value === current ? 'checked' : ''}><span><b>${label}</b><small>${description}</small></span></label>`
@@ -174,7 +220,9 @@
       address: {
         zip: data.zip || '', street: data.street || '', number: data.number || '',
         complement: data.complement || '', neighborhood: data.neighborhood || '',
-        reference: data.reference || '', city: data.city || ''
+        reference: data.reference || '', city: data.city || '',
+        latitude: data.latitude || '', longitude: data.longitude || '',
+        mapUrl: data.latitude && data.longitude ? `https://www.google.com/maps?q=${encodeURIComponent(data.latitude)},${encodeURIComponent(data.longitude)}` : ''
       },
       paymentMethod: data.paymentMethod || 'pix',
       changeFor: data.changeFor || '',
@@ -185,7 +233,7 @@
       total: CartStore.subtotal() + delivery
     };
     let whatsappWindow = null;
-    if (catalog.settings.autoOpenWhatsApp !== false) {
+    if (catalog.settings.autoOpenWhatsApp !== false && !catalog.settings.whatsappCloudEnabled) {
       whatsappWindow = window.open('', 'acai-pedido-whatsapp');
       if (whatsappWindow) whatsappWindow.document.title = 'Preparando pedido no WhatsApp';
     }
@@ -214,7 +262,11 @@
     box.hidden = false;
     const title = result.stored ? 'PEDIDO REGISTRADO' : 'PEDIDO PRONTO';
     const message = result.stored
-      ? 'Seu pedido foi enviado automaticamente ao painel. O WhatsApp foi aberto com a nota completa para confirmação da loja.'
+      ? (result.notificationSent
+        ? 'Seu pedido foi enviado ao painel e ao WhatsApp da loja automaticamente.'
+        : result.notificationError
+          ? 'Seu pedido está seguro no painel. A automação do WhatsApp precisa ser revisada pela loja.'
+          : 'Seu pedido foi enviado automaticamente ao painel. Use o WhatsApp abaixo se quiser falar com a loja.')
       : 'Não foi possível registrar no painel. Envie agora a nota completa pelo WhatsApp.';
     box.innerHTML = `<span class="success-icon">✓</span><small>${title}</small>` +
       `<h2>Obrigado ${String(name).split(' ')[0]}!</h2><p>${message}</p>` +
@@ -241,6 +293,7 @@
       if (event.target.id === 'checkout-overlay') close();
     });
     $('#checkout-form').addEventListener('submit', submit);
+    $('#use-location').addEventListener('click', useCurrentLocation);
     const phone = $('#checkout-form').elements.namedItem('phone');
     phone.addEventListener('input', () => {
       clearTimeout(phoneTimer);

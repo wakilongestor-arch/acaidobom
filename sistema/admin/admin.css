@@ -65,3 +65,28 @@ body.dialog-open{overflow:hidden}
   .hours-row{grid-template-columns:1fr 1fr}
   .hours-row>label{grid-column:1/-1}
 }
+
+/* Quadro de pedidos estilo CRM. */
+.order-toolbar{display:flex;align-items:center;gap:7px}
+.order-toolbar button{padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--brand);font-weight:900}
+.order-toolbar button.active{border-color:var(--brand);background:var(--brand);color:#fff}
+.orders-board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(310px,350px);align-items:start;gap:13px;overflow-x:auto;padding:2px 2px 22px;scroll-snap-type:x proximity}
+.order-column{min-height:210px;border:1px solid var(--line);border-top:4px solid var(--stage-color,var(--brand));border-radius:14px;background:#f8f4f9;overflow:hidden;scroll-snap-align:start}
+.order-column>header{padding:12px 13px;display:flex;justify-content:space-between;align-items:center;color:var(--stage-color,var(--brand));background:#fff;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.order-column>header span{min-width:25px;padding:4px 7px;border-radius:999px;background:var(--stage-color,var(--brand));color:#fff;text-align:center}
+.order-column-body{padding:9px;display:grid;gap:9px}
+.column-novo{--stage-color:#2563eb}.column-confirmado{--stage-color:#7c3aed}.column-preparando{--stage-color:#f59e0b}.column-saiu_entrega{--stage-color:#0891b2}.column-concluido{--stage-color:#16a34a}.column-cancelado{--stage-color:#dc2626}
+.order-ticket{border-left-color:var(--stage-color,var(--brand))!important}
+.order-ticket.status-novo{--stage-color:#2563eb}.order-ticket.status-confirmado{--stage-color:#7c3aed}.order-ticket.status-preparando{--stage-color:#f59e0b}.order-ticket.status-saiu_entrega{--stage-color:#0891b2}.order-ticket.status-concluido{--stage-color:#16a34a}.order-ticket.status-cancelado{--stage-color:#dc2626}
+.status-badge[data-status=novo]{background:#2563eb;color:#fff}.status-badge[data-status=confirmado]{background:#7c3aed}.status-badge[data-status=preparando]{background:#f59e0b;color:#26011a}.status-badge[data-status=saiu_entrega]{background:#0891b2}.status-badge[data-status=concluido]{background:#16a34a}.status-badge[data-status=cancelado]{background:#dc2626}
+.order-meta .payment-badge.paid{background:#16a34a}.order-meta .payment-badge.pending{background:#f59e0b;color:#26011a}.order-meta .payment-badge.refunded{background:#dc2626}
+.orders-board .order-ticket{margin:0;padding:14px;border-radius:11px;background:#fff}
+.orders-board .ticket-head{gap:8px}.orders-board .ticket-head>strong{font-size:15px}.orders-board .customer{grid-template-columns:1fr 1fr;gap:7px}
+.orders-board .order-ticket:not(.expanded) .order-section-title,.orders-board .order-ticket:not(.expanded) .order-items,.orders-board .order-ticket:not(.expanded) .order-address,.orders-board .order-ticket:not(.expanded) .order-notes,.orders-board .order-ticket:not(.expanded) .order-totals,.orders-board .order-ticket:not(.expanded) .order-selects{display:none}
+.orders-board .order-ticket:not(.expanded) .order-meta span:first-child{display:none}
+.orders-board .order-actions{display:grid;grid-template-columns:1fr 1fr}.orders-board .order-actions button,.orders-board .order-actions a{text-align:center}
+.orders-board .order-actions [data-copy-order],.orders-board .order-actions a{display:none}
+.orders-board .order-ticket.expanded .order-actions [data-copy-order],.orders-board .order-ticket.expanded .order-actions a{display:block}
+.orders-list-view{display:grid;gap:14px}.orders-list-view .order-ticket{background:#fff}
+.map-link{display:inline-block;margin-top:6px;color:var(--brand);font-weight:900;text-decoration:underline}
+@media(max-width:760px){.title.row{gap:12px;flex-wrap:wrap}.order-toolbar{width:100%;overflow-x:auto}.order-toolbar button{white-space:nowrap}.orders-board{grid-auto-columns:minmax(285px,86vw)}}

@@ -50,6 +50,7 @@
     const db = getClient();
     if (!db) return false;
     const row = {
+      id: crypto.randomUUID(),
       order_number: orderNumber,
       customer: payload.customer,
       fulfillment: payload.fulfillment,
@@ -66,7 +67,23 @@
     };
     const { error } = await db.from('orders').insert(row);
     throwIfError(error, 'Não foi possível registrar o pedido.');
-    return true;
+    return { id: row.id, order_number: row.order_number };
+  }
+
+  async function notifyOrder(orderId) {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { data, error } = await db.functions.invoke('whatsapp-order', { body: { orderId } });
+    throwIfError(error, 'O pedido foi salvo, mas o WhatsApp automático não foi enviado.');
+    return data || {};
+  }
+
+  async function createCheckout(orderId, provider) {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { data, error } = await db.functions.invoke('create-checkout', { body: { orderId, provider } });
+    throwIfError(error, 'O pedido foi salvo, mas o checkout não pôde ser criado.');
+    return data || {};
   }
 
   async function listOrders() {
@@ -172,6 +189,8 @@
     loadCatalog,
     saveCatalog,
     createOrder,
+    notifyOrder,
+    createCheckout,
     listOrders,
     updateOrder,
     uploadImage,
