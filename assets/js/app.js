@@ -20,6 +20,7 @@
   let quantity = 1;
   let productTrigger = null;
   let statusTimer = null;
+  let lockedScrollY = 0;
 
   try {
     catalog = await MenuAPI.loadCatalog();
@@ -184,9 +185,10 @@
       const category = catalog.categories.find(item => item.id === product.categoryId) || {};
       const imageUrl = product.imageUrl || category.imageUrl || '';
       return '<article class="product-card"><button type="button" data-product="' + escape(product.id) + '">' +
-        '<div class="product-media">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + (product.badge ? '<b>' + escape(product.badge) + '</b>' : '') + '</div>' +
         '<div class="product-copy"><small>' + escape(category.name || 'Açaí do Bom') + '</small><h3>' + escape(product.name) + '</h3><p>' + escape(product.description) + '</p>' +
-        '<footer><b>' + MenuAPI.money(product.price) + '</b><span>＋</span></footer></div></button></article>';
+        '<footer><b>' + MenuAPI.money(product.price) + '</b><span aria-hidden="true">＋</span></footer></div>' +
+        '<div class="product-media">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + (product.badge ? '<b>' + escape(product.badge) + '</b>' : '') + '</div>' +
+      '</button></article>';
     }).join('');
     bindImageFallbacks(container);
     container.querySelectorAll('[data-product]').forEach(button => {
@@ -288,17 +290,17 @@
       notes: $('#item-notes').value.trim(),
       unitTotal: unitTotal()
     });
-    closeProduct(false);
+    closeProduct(false, true);
     openCart();
   }
 
-  function closeProduct(restoreFocus = true) {
+  function closeProduct(restoreFocus = true, keepLocked = false) {
     const overlay = $('#product-overlay');
     if (overlay.hidden) return;
     overlay.hidden = true;
     selected = null;
     selections = {};
-    syncBodyLock();
+    if (!keepLocked) syncBodyLock();
     if (restoreFocus) productTrigger?.focus?.();
   }
 
@@ -311,14 +313,22 @@
     $('#mobile-total').textContent = MenuAPI.money(subtotal);
     $$('.mobile-cart').forEach(element => { element.hidden = !count; });
     $('#cart-footer').hidden = !count;
-    $('#cart-items').innerHTML = items.length ? items.map(item =>
-      '<article><header><div><b>' + item.quantity + 'x ' + escape(item.name) + '</b><strong>' + MenuAPI.money(item.unitTotal * item.quantity) +
-      '</strong></div><button type="button" data-remove="' + escape(item.cartId) + '" aria-label="Remover produto">🗑</button></header>' +
-      (item.selections || []).map(selection => '<p>' + escape(selection.groupName) + ': ' + selection.options.map(option => escape(option.name)).join(', ') + '</p>').join('') +
-      (item.notes ? '<p>Obs: ' + escape(item.notes) + '</p>' : '') +
-      '<div class="quantity small"><button type="button" data-minus="' + escape(item.cartId) + '">−</button><b>' + item.quantity +
-      '</b><button type="button" data-plus="' + escape(item.cartId) + '">+</button></div></article>'
-    ).join('') : '<div class="empty"><span>🛍</span><h3>Seu carrinho está vazio</h3><p>Escolha seus favoritos no cardápio.</p></div>';
+    const suggestions = getCartSuggestions(items);
+    $('#cart-items').innerHTML = items.length ?
+      '<div class="cart-lines">' + items.map(item => {
+        const product = catalog.products.find(current => current.id === item.productId) || {};
+        const category = catalog.categories.find(current => current.id === product.categoryId) || {};
+        const imageUrl = item.imageUrl || product.imageUrl || category.imageUrl || '';
+        return '<article class="cart-line"><div class="cart-product-image">' + imageMarkup(imageUrl, item.name, category.emoji || '🥣') + '</div><div class="cart-product-info">' +
+          '<header><div><b>' + escape(item.name) + '</b><strong>' + MenuAPI.money(item.unitTotal * item.quantity) +
+          '</strong></div><button type="button" data-remove="' + escape(item.cartId) + '" aria-label="Remover produto">🗑</button></header>' +
+          (item.selections || []).map(selection => '<p>' + escape(selection.groupName) + ': ' + selection.options.map(option => escape(option.name)).join(', ') + '</p>').join('') +
+          (item.notes ? '<p>Obs: ' + escape(item.notes) + '</p>' : '') +
+          '<div class="quantity small"><button type="button" data-minus="' + escape(item.cartId) + '" aria-label="Diminuir quantidade">−</button><b>' + item.quantity +
+          '</b><button type="button" data-plus="' + escape(item.cartId) + '" aria-label="Aumentar quantidade">+</button></div></div></article>';
+      }).join('') + '</div>' + renderCartSuggestions(suggestions) :
+      '<div class="empty"><span>🛍</span><h3>Seu carrinho está vazio</h3><p>Escolha seus favoritos no cardápio.</p></div>';
+    bindImageFallbacks($('#cart-items'));
     $('#cart-items').querySelectorAll('[data-remove]').forEach(button => {
       button.onclick = () => CartStore.remove(button.dataset.remove);
     });
@@ -334,7 +344,40 @@
         if (item) CartStore.quantity(item.cartId, item.quantity + 1);
       };
     });
+    $('#cart-items').querySelectorAll('[data-suggestion]').forEach(button => {
+      button.onclick = () => {
+        const productId = button.dataset.suggestion;
+        closeCart();
+        requestAnimationFrame(() => openProduct(productId, button));
+      };
+    });
     applyStoreStateToCheckout();
+  }
+
+  function getCartSuggestions(items) {
+    const inCart = new Set(items.map(item => item.productId));
+    const complementary = /bebida|refrigerante|coca|fanta|suco|pastel|porç|batata|acompanhamento/i;
+    return catalog.products
+      .filter(product => product.active && !inCart.has(product.id))
+      .map((product, index) => {
+        const category = catalog.categories.find(item => item.id === product.categoryId) || {};
+        const text = `${product.name} ${category.name || ''}`;
+        const score = (complementary.test(text) ? 100 : 0) + (product.featured ? 10 : 0) - index;
+        return { product, category, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+  }
+
+  function renderCartSuggestions(suggestions) {
+    if (!suggestions.length) return '';
+    return '<section class="cart-suggestions"><header><small>COMBINA COM SEU PEDIDO</small><h3>Peça também</h3></header><div class="suggestion-track">' + suggestions.map(({ product, category }) => {
+      const imageUrl = product.imageUrl || category.imageUrl || '';
+      return '<button type="button" class="suggestion-card" data-suggestion="' + escape(product.id) + '">' +
+        '<span class="suggestion-image">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + '<i>＋</i></span>' +
+        '<b>' + MenuAPI.money(product.price) + '</b><strong>' + escape(product.name) + '</strong>' +
+      '</button>';
+    }).join('') + '</div></section>';
   }
 
   function minutes(value) {
@@ -420,7 +463,16 @@
 
   function syncBodyLock() {
     const locked = !$('#product-overlay').hidden || $('#cart').classList.contains('open') || !$('#checkout-overlay').hidden;
-    document.body.classList.toggle('no-scroll', locked);
+    const active = document.body.classList.contains('no-scroll');
+    if (locked && !active) {
+      lockedScrollY = window.scrollY;
+      document.body.style.top = `-${lockedScrollY}px`;
+      document.body.classList.add('no-scroll');
+    } else if (!locked && active) {
+      document.body.classList.remove('no-scroll');
+      document.body.style.top = '';
+      window.scrollTo(0, lockedScrollY);
+    }
   }
 
   function openCart() {

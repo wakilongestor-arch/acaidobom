@@ -41,6 +41,8 @@ body.dialog-open{overflow:hidden}
 .category-active{margin:0!important;display:flex!important;align-items:center;gap:6px}
 .category-active input{width:18px}
 .upload-help{display:block;margin-top:7px;color:var(--brand);font-size:9px;line-height:1.4}
+.image-guide{margin:0 0 11px;padding:10px 11px;border-left:4px solid var(--accent);border-radius:8px;background:#fff9cf;display:grid;gap:3px;color:var(--brand)}
+.image-guide b{font-size:11px}.image-guide span{font-size:9px;line-height:1.4}.image-guide.compact{margin-bottom:9px;padding:8px 9px}
 .remove-image{width:100%;margin-top:7px;padding:7px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--brand)}
 .upload.busy,.category-upload.busy{pointer-events:none;opacity:.55}
 .order-ticket{border-left:5px solid var(--brand)!important;box-shadow:0 8px 25px #6208530c}
