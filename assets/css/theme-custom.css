@@ -64,9 +64,27 @@ body.no-scroll{position:fixed;inset-inline:0;width:100%;overflow:hidden;overscro
 .product-modal{display:flex;flex-direction:column;max-height:min(94vh,820px)}
 .product-modal-head,.modal-footer{flex:0 0 auto}
 .addon-list{flex:1 1 auto;min-height:80px;max-height:none;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.product-step-head{flex:0 0 auto;padding:13px 20px 10px;border-bottom:1px solid var(--line);background:#fff}
+.product-step-head>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.product-step-head small{color:var(--brand);font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.product-step-head b{font-size:15px;color:var(--ink)}
+.product-step-head>span{display:block;height:5px;margin-top:10px;border-radius:99px;background:rgba(98,8,83,.1);overflow:hidden}
+.product-step-head i{display:block;width:0;height:100%;border-radius:inherit;background:var(--accent);transition:width .22s ease}
 .addon-list label{touch-action:manipulation;user-select:none}
+.addon-list fieldset{margin:0;padding:4px 0 12px}
+.addon-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.addon-list .addon-option{position:relative;min-width:0;min-height:92px;margin:0;padding:10px;grid-template-columns:58px minmax(0,1fr) 22px;gap:10px;background:#fff}
+.addon-option>input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.addon-option-media{width:58px;height:58px;border-radius:14px;display:grid;place-items:center;overflow:hidden;background:#fff7c7}
+.addon-option-media img{width:100%;height:100%;object-fit:cover}.addon-option-media em{font-size:32px;font-style:normal}
+.addon-option-copy{min-width:0;display:grid;gap:5px}.addon-option-copy>b{overflow-wrap:anywhere;font-size:13px}.addon-option-copy>small{color:var(--brand);font-size:11px;font-weight:800}
+.addon-option>i{width:20px;height:20px;border:1px solid rgba(98,8,83,.22);border-radius:50%;display:grid;place-items:center;color:transparent;font-size:12px;font-style:normal;font-weight:900}
+.addon-option.selected>i{border-color:var(--brand);background:var(--brand);color:#fff}
+.addon-option:focus-within{outline:3px solid rgba(98,8,83,.2);outline-offset:1px}
+.product-review{display:grid;gap:0;padding:7px 0 16px}.product-review h3{margin:0 0 8px;font-size:16px}.product-review>div{padding:11px 0;border-bottom:1px solid var(--line);display:grid;gap:4px}.product-review>div b{font-size:12px}.product-review>div span,.product-review>p{color:#6f5b6b;font-size:12px;line-height:1.45}
 .addon-list label.selected,.fulfillment input:checked+span{background:#fff9cf;border-color:var(--accent)}
 .modal-footer{grid-template-columns:auto minmax(0,1fr);align-items:center;background:#fff}
+.modal-footer:not(.review-mode) .product-actions{grid-column:1/-1}
 .product-actions{display:grid;grid-template-columns:minmax(96px,.7fr) minmax(190px,1.5fr);gap:9px}
 .product-actions button{height:46px;border-radius:11px;font-weight:900}
 .secondary{border:1px solid var(--brand);background:#fff;color:var(--brand);cursor:pointer}
@@ -77,7 +95,7 @@ body.no-scroll{position:fixed;inset-inline:0;width:100%;overflow:hidden;overscro
 @media(max-width:700px){
   .brand-mark.has-logo{width:116px;height:52px}
   .topbar{padding-left:12px;padding-right:12px}
-  .footer .brand-mark.has-logo{width:180px;height:90px}
+  .footer .brand-mark.has-logo{width:106px;height:50px}
   .categories{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
   .categories button{width:118px;height:102px;grid-template-rows:70px 32px;border-radius:15px}
   .categories button .category-media{height:70px}
@@ -144,7 +162,8 @@ button,a,label{touch-action:manipulation}
   .product-modal{max-height:100vh;max-height:100dvh}
   .product-modal-head{grid-template-columns:92px minmax(0,1fr);gap:12px;padding:15px 52px 14px 15px}
   .product-modal-head img{width:92px;height:92px;border-radius:13px}.product-modal-head h2{margin:2px 0 5px;font-size:18px}.product-modal-head p{font-size:11px;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
-  .addon-list{min-height:0;padding-inline:15px}.notes{padding-inline:15px}.modal-footer{padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+  .product-step-head{padding-inline:15px}.addon-list{min-height:0;padding-inline:15px;touch-action:pan-y}.notes{padding-inline:15px}.modal-footer{padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+  .addon-options{grid-template-columns:1fr}.addon-list .addon-option{min-height:78px;grid-template-columns:52px minmax(0,1fr) 22px}.addon-option-media{width:52px;height:52px}.addon-option-media em{font-size:29px}
 }
 @media(max-width:380px){
   .product-card>button{grid-template-columns:minmax(0,1fr) 96px;gap:10px}.product-media{width:96px;height:96px}.product-copy h3{font-size:15px}.product-copy p{font-size:11px}.product-copy footer>b{font-size:15px}
@@ -153,7 +172,7 @@ button,a,label{touch-action:manipulation}
 @media(max-width:430px){
   .modal-footer{grid-template-columns:1fr}
   .quantity{width:max-content}
-  .product-actions{grid-template-columns:1fr 1.6fr}
+  .product-actions{grid-template-columns:minmax(86px,.75fr) minmax(150px,1.4fr)}
 }
 
 /* Categorias compactas: nenhuma imagem pode alterar a largura do botão. */

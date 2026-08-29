@@ -18,6 +18,7 @@
   let selected = null;
   let selections = {};
   let quantity = 1;
+  let productStep = 0;
   let productTrigger = null;
   let statusTimer = null;
   let lockedScrollY = 0;
@@ -155,15 +156,6 @@
       '</button>'
     ).join('');
     bindImageFallbacks(container);
-    container.querySelectorAll('button').forEach(button => {
-      button.addEventListener('click', () => {
-        active = button.dataset.category;
-        query = '';
-        $('#search').value = '';
-        renderCategories();
-        renderProducts();
-      });
-    });
   }
 
   function list() {
@@ -191,9 +183,86 @@
       '</button></article>';
     }).join('');
     bindImageFallbacks(container);
-    container.querySelectorAll('[data-product]').forEach(button => {
-      button.addEventListener('click', () => openProduct(button.dataset.product, button));
-    });
+  }
+
+  function productGroups() {
+    return (selected?.addonGroups || [])
+      .map(group => ({ ...group, options: (group.options || []).filter(option => option.available !== false) }))
+      .filter(group => group.options.length);
+  }
+
+  function normalizeOptionName(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  function optionEmoji(option, group) {
+    const value = normalizeOptionName(`${option.name} ${group.name}`);
+    const visuals = [
+      [/banana/, '🍌'], [/morango/, '🍓'], [/kiwi/, '🥝'], [/manga/, '🥭'], [/uva/, '🍇'],
+      [/granola/, '🥣'], [/leite em po/, '🥛'], [/pacoca/, '🥜'], [/avela/, '🍫'], [/condensado/, '🥛'],
+      [/bacon/, '🥓'], [/queijo/, '🧀'], [/ovo/, '🥚'], [/refrigerante|coca|fanta/, '🥤'],
+      [/300|500|700|tamanho|media|grande/, '🥤']
+    ];
+    return visuals.find(([pattern]) => pattern.test(value))?.[1] || '✨';
+  }
+
+  function optionMedia(option, group) {
+    if (option.imageUrl) return imageMarkup(option.imageUrl, option.name, optionEmoji(option, group), false);
+    return '<em aria-hidden="true">' + optionEmoji(option, group) + '</em>';
+  }
+
+  function validateGroup(group) {
+    const minimum = Number(group?.min || 0);
+    const chosen = (selections[group?.id] || []).length;
+    if (chosen >= minimum) return true;
+    const error = $('#product-error');
+    error.textContent = 'Escolha ' + minimum + (minimum === 1 ? ' opção' : ' opções') + ' em “' + group.name + '” para continuar.';
+    error.hidden = false;
+    $('#addon-list input')?.focus({ preventScroll: true });
+    return false;
+  }
+
+  function renderProductStep() {
+    if (!selected) return;
+    const groups = productGroups();
+    const total = groups.length + 1;
+    productStep = Math.max(0, Math.min(productStep, total - 1));
+    const group = groups[productStep];
+    const isReview = !group;
+    const addonList = $('#addon-list');
+    $('#product-step-label').textContent = 'Etapa ' + (productStep + 1) + ' de ' + total;
+    $('#product-step-title').textContent = isReview ? 'Revise e confirme' : group.name;
+    $('#product-step-progress').style.width = (((productStep + 1) / total) * 100) + '%';
+    $('#product-step-back').textContent = productStep ? '← Voltar' : 'Cancelar';
+    $('#product-notes').hidden = !isReview;
+    $('#product-quantity').hidden = !isReview;
+    $('#product-overlay .modal-footer').classList.toggle('review-mode', isReview);
+    $('#product-error').hidden = true;
+
+    if (isReview) {
+      const summary = groups.filter(item => (selections[item.id] || []).length).map(item =>
+        '<div><b>' + escape(item.name) + '</b><span>' + selections[item.id].map(option => escape(option.name)).join(', ') + '</span></div>'
+      ).join('');
+      addonList.innerHTML = '<section class="product-review"><h3>Seu produto</h3>' +
+        (summary || '<p>Este produto não precisa de opções adicionais.</p>') + '</section>';
+    } else {
+      const maximum = Number(group.max || 1);
+      const minimum = Number(group.min || 0);
+      addonList.innerHTML = '<fieldset data-group="' + escape(group.id) + '"><legend><span><b>' + escape(group.name) + '</b><small>' +
+        (minimum ? 'Escolha pelo menos ' + minimum : 'Opcional') + ' · até ' + maximum +
+        '</small></span>' + (minimum ? '<em>OBRIGATÓRIO</em>' : '') + '</legend><div class="addon-options">' +
+        group.options.map(option => {
+          const checked = (selections[group.id] || []).some(item => item.id === option.id);
+          return '<label class="addon-option' + (checked ? ' selected' : '') + '"><input type="' + (maximum === 1 ? 'radio' : 'checkbox') +
+            '" name="group-' + escape(group.id) + '" value="' + escape(option.id) + '"' + (checked ? ' checked' : '') +
+            '><span class="addon-option-media">' + optionMedia(option, group) + '</span><span class="addon-option-copy"><b>' +
+            escape(option.name) + '</b><small>' + (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso') +
+            '</small></span><i aria-hidden="true">✓</i></label>';
+        }).join('') + '</div></fieldset>';
+      bindImageFallbacks(addonList);
+    }
+    addonList.scrollTop = 0;
+    updateProductTotal();
   }
 
   function openProduct(id, trigger) {
@@ -202,6 +271,7 @@
     productTrigger = trigger || document.activeElement;
     selections = {};
     quantity = 1;
+    productStep = 0;
     const category = catalog.categories.find(item => item.id === selected.categoryId) || {};
     $('#product-image').src = selected.imageUrl || category.imageUrl || catalog.settings.bannerUrl;
     $('#product-image').alt = selected.name;
@@ -209,22 +279,7 @@
     $('#product-description').textContent = selected.description;
     $('#product-base-price').textContent = 'A partir de ' + MenuAPI.money(selected.price);
     $('#item-notes').value = '';
-    $('#product-error').hidden = true;
-    $('#addon-list').innerHTML = (selected.addonGroups || []).map(group =>
-      '<fieldset data-group="' + escape(group.id) + '"><legend><span><b>' + escape(group.name) + '</b><small>' +
-      (group.required ? 'Obrigatório' : 'Opcional') + ' · escolha até ' + Number(group.max || 1) +
-      '</small></span>' + (group.required ? '<em>OBRIGATÓRIO</em>' : '') + '</legend>' +
-      (group.options || []).filter(option => option.available !== false).map(option =>
-        '<label><input type="' + (Number(group.max || 1) === 1 ? 'radio' : 'checkbox') + '" name="group-' + escape(group.id) +
-        '" value="' + escape(option.id) + '"><span>' + escape(option.name) + '</span><b>' +
-        (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso') + '</b></label>'
-      ).join('') + '</fieldset>'
-    ).join('');
-    $('#addon-list').querySelectorAll('input').forEach(input => {
-      input.addEventListener('change', () => changeSelection(input));
-    });
-    $('#addon-list').scrollTop = 0;
-    updateProductTotal();
+    renderProductStep();
     $('#product-overlay').hidden = false;
     syncBodyLock();
     requestAnimationFrame(() => $('#product-overlay .modal-close')?.focus());
@@ -233,12 +288,14 @@
   function changeSelection(input) {
     if (!selected) return;
     const field = input.closest('fieldset');
-    const group = selected.addonGroups.find(item => item.id === field.dataset.group);
+    const group = productGroups().find(item => item.id === field.dataset.group);
+    if (!group) return;
     const option = group.options.find(item => item.id === input.value);
+    if (!option) return;
     const current = selections[group.id] || [];
     if (Number(group.max || 1) === 1) {
       selections[group.id] = input.checked ? [option] : [];
-      field.querySelectorAll('label').forEach(label => label.classList.toggle('selected', label.contains(input)));
+      field.querySelectorAll('.addon-option').forEach(label => label.classList.toggle('selected', label.contains(input)));
     } else if (input.checked) {
       if (current.length >= Number(group.max || 1)) {
         input.checked = false;
@@ -248,33 +305,60 @@
         return;
       }
       selections[group.id] = [...current, option];
-      input.closest('label').classList.add('selected');
+      input.closest('.addon-option').classList.add('selected');
     } else {
       selections[group.id] = current.filter(item => item.id !== option.id);
-      input.closest('label').classList.remove('selected');
+      input.closest('.addon-option').classList.remove('selected');
     }
     $('#product-error').hidden = true;
     updateProductTotal();
   }
 
   function unitTotal() {
-    return Number(selected?.price || 0) + Object.values(selections).flat().reduce((sum, option) => sum + Number(option.price), 0);
+    return Number(selected?.price || 0) + Object.values(selections).flat().reduce((sum, option) => sum + Number(option.price || 0), 0);
   }
 
   function updateProductTotal() {
     $('#item-quantity').textContent = quantity;
-    $('#add-to-cart').textContent = 'Confirmar produto · ' + MenuAPI.money(unitTotal() * quantity);
+    const isReview = productStep >= productGroups().length;
+    $('#add-to-cart').textContent = isReview
+      ? 'Adicionar · ' + MenuAPI.money(unitTotal() * quantity)
+      : 'Continuar →';
+  }
+
+  function advanceProduct() {
+    if (!selected) return;
+    const groups = productGroups();
+    if (productStep < groups.length) {
+      if (!validateGroup(groups[productStep])) return;
+      productStep += 1;
+      renderProductStep();
+      return;
+    }
+    addProduct();
+  }
+
+  function previousProductStep() {
+    if (!selected) return;
+    if (productStep === 0) {
+      closeProduct();
+      return;
+    }
+    productStep -= 1;
+    renderProductStep();
   }
 
   function addProduct() {
     if (!selected) return;
-    for (const group of selected.addonGroups || []) {
+    for (const group of productGroups()) {
       if ((selections[group.id] || []).length < Number(group.min || 0)) {
         const error = $('#product-error');
         error.textContent = 'Escolha ' + Number(group.min || 1) + ' opção em “' + group.name + '”.';
         error.hidden = false;
-        const field = $('#addon-list').querySelector('[data-group="' + CSS.escape(group.id) + '"]');
-        field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        productStep = productGroups().findIndex(item => item.id === group.id);
+        renderProductStep();
+        $('#product-error').textContent = 'Escolha ' + Number(group.min || 1) + ' opção em “' + group.name + '”.';
+        $('#product-error').hidden = false;
         return;
       }
     }
@@ -300,6 +384,7 @@
     overlay.hidden = true;
     selected = null;
     selections = {};
+    productStep = 0;
     if (!keepLocked) syncBodyLock();
     if (restoreFocus) productTrigger?.focus?.();
   }
@@ -494,6 +579,23 @@
       query = event.target.value;
       renderProducts();
     });
+    $('#categories').addEventListener('click', event => {
+      const button = event.target.closest('[data-category]');
+      if (!button || !$('#categories').contains(button)) return;
+      active = button.dataset.category;
+      query = '';
+      $('#search').value = '';
+      renderCategories();
+      renderProducts();
+    });
+    $('#products').addEventListener('click', event => {
+      const button = event.target.closest('[data-product]');
+      if (!button || !$('#products').contains(button)) return;
+      openProduct(button.dataset.product, button);
+    });
+    $('#addon-list').addEventListener('change', event => {
+      if (event.target.matches('input')) changeSelection(event.target);
+    });
     $$('[data-open-cart]').forEach(button => button.addEventListener('click', openCart));
     $('#cart-items').addEventListener('click', handleCartClick);
     $('[data-close-cart]').addEventListener('click', closeCart);
@@ -510,7 +612,8 @@
       quantity += 1;
       updateProductTotal();
     });
-    $('#add-to-cart').addEventListener('click', addProduct);
+    $('#product-step-back').addEventListener('click', previousProductStep);
+    $('#add-to-cart').addEventListener('click', advanceProduct);
     $('#start-checkout').addEventListener('click', () => {
       const state = calculateStoreState();
       if (!state.open) {

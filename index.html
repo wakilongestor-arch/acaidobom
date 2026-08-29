@@ -2,15 +2,28 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
+  <script>if(location.protocol==='http:'&&/^(www\.)?acaidobom\.com\.br$/i.test(location.hostname)){location.replace('https://'+location.host+location.pathname+location.search+location.hash)}</script>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Açaí do Bom | Cardápio e Delivery em Ji-Paraná</title>
-  <meta name="description" content="Monte seu açaí do seu jeito e peça com delivery próprio em Ji-Paraná, Rondônia.">
+  <title>Cardápio Açaí do Bom | Frutas e Acompanhamentos em Ji-Paraná</title>
+  <meta name="description" content="Monte seu açaí por etapas, escolha tamanho, frutas e acompanhamentos e peça com delivery próprio em Ji-Paraná, Rondônia.">
   <meta name="theme-color" content="#620853">
   <link rel="canonical" href="https://acaidobom.com.br/">
-  <meta property="og:title" content="Açaí do Bom | Cardápio e Delivery">
-  <meta property="og:description" content="Monte seu açaí do seu jeito e peça com delivery próprio em Ji-Paraná, Rondônia.">
+  <meta property="og:site_name" content="Açaí do Bom">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:title" content="Cardápio Açaí do Bom | Frutas e Acompanhamentos">
+  <meta property="og:description" content="Escolha seu açaí, frutas e acompanhamentos por etapas e peça on-line em Ji-Paraná.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://acaidobom.com.br/">
+  <meta property="og:image" content="https://acaidobom.com.br/assets/images/social/cardapio-acai-do-bom.jpg">
+  <meta property="og:image:secure_url" content="https://acaidobom.com.br/assets/images/social/cardapio-acai-do-bom.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="1200">
+  <meta property="og:image:alt" content="Cardápio Açaí do Bom">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cardápio Açaí do Bom | Frutas e Acompanhamentos">
+  <meta name="twitter:description" content="Monte seu açaí por etapas e escolha frutas e acompanhamentos.">
+  <meta name="twitter:image" content="https://acaidobom.com.br/assets/images/social/cardapio-acai-do-bom.jpg">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="48x48" href="assets/images/favicon/favicon-48.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
@@ -66,10 +79,11 @@
     <section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-name">
       <button class="modal-close" data-close-product aria-label="Fechar">×</button>
       <div class="product-modal-head"><img id="product-image" alt=""><div><h2 id="product-name"></h2><p id="product-description"></p><b id="product-base-price"></b></div></div>
-      <div class="addon-list" id="addon-list"></div>
-      <label class="field notes"><span>Alguma observação?</span><textarea id="item-notes" placeholder="Ex: separar granola sem leite condensado"></textarea></label>
-      <p class="error" id="product-error" hidden></p>
-      <footer class="modal-footer"><div class="quantity"><button type="button" data-qty-minus aria-label="Diminuir quantidade">−</button><b id="item-quantity">1</b><button type="button" data-qty-plus aria-label="Aumentar quantidade">+</button></div><div class="product-actions"><button type="button" class="secondary" data-close-product>Cancelar</button><button type="button" class="primary" id="add-to-cart">Confirmar produto · R$ 0,00</button></div></footer>
+      <header class="product-step-head"><div><small id="product-step-label">Etapa 1 de 1</small><b id="product-step-title">Escolha as opções</b></div><span aria-hidden="true"><i id="product-step-progress"></i></span></header>
+      <div class="addon-list" id="addon-list" aria-live="polite"></div>
+      <label class="field notes" id="product-notes" hidden><span>Alguma observação?</span><textarea id="item-notes" placeholder="Ex: separar granola sem leite condensado"></textarea></label>
+      <p class="error" id="product-error" role="alert" hidden></p>
+      <footer class="modal-footer"><div class="quantity" id="product-quantity" hidden><button type="button" data-qty-minus aria-label="Diminuir quantidade">−</button><b id="item-quantity">1</b><button type="button" data-qty-plus aria-label="Aumentar quantidade">+</button></div><div class="product-actions"><button type="button" class="secondary" id="product-step-back">Cancelar</button><button type="button" class="primary" id="add-to-cart">Continuar →</button></div></footer>
     </section>
   </div>
 
