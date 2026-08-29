@@ -19,6 +19,18 @@ const firstName = (value: unknown) => {
   const name = String(value ?? '').trim().split(/\s+/)[0] || 'cliente';
   return name.charAt(0).toLocaleUpperCase('pt-BR') + name.slice(1).toLocaleLowerCase('pt-BR');
 };
+const safeImageUrl = (value: unknown) => {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : '';
+  } catch (_) {
+    return '';
+  }
+};
+const messageVariables = (value: unknown, order: any, customerFirstName: string) => String(value ?? '')
+  .replace(/\{primeiro_nome\}/gi, customerFirstName)
+  .replace(/\{pedido\}/gi, String(order.order_number || ''))
+  .replace(/\{total\}/gi, money(order.total));
 
 const eventNames: Record<string, string> = {
   created: 'order.created',
@@ -106,10 +118,12 @@ function itemRows(order: any) {
   }).join('');
 }
 
-function emailFrame(title: string, intro: string, content: string, store: any) {
+function emailFrame(title: string, intro: string, content: string, store: any, imageUrl = '') {
   const name = html(store.establishmentName || store.storeName || 'Açaí do Bom');
   const contact = html(store.publicEmail || store.orderEmail || 'contato@acaidobom.com.br');
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>@media only screen and (max-width:620px){.email-wrap{padding:12px 8px!important}.email-content{padding:24px 20px!important}.email-title{font-size:27px!important}}</style></head><body style="margin:0;background:#f5f1f6;font-family:Arial,Helvetica,sans-serif;color:#281225"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${html(intro)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1f6"><tr><td class="email-wrap" style="padding:28px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 8px 28px rgba(77,9,65,.10)"><tr><td align="center" style="background-color:#620853;background-image:linear-gradient(135deg,#510544 0%,#810b6d 100%);padding:25px 24px 28px;border-bottom:7px solid #fcd307"><div style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">${name}</div><div style="display:inline-block;background:#fcd307;color:#4a073f;border-radius:999px;padding:7px 13px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Atualização do pedido</div><h1 class="email-title" style="color:#ffffff;font-size:31px;line-height:1.15;margin:14px 0 0">${html(title)}</h1></td></tr><tr><td class="email-content" style="padding:30px 34px"><p style="font-size:17px;line-height:1.65;margin:0;color:#32142d">${html(intro)}</p>${content}</td></tr><tr><td style="background:#fff7c7;padding:20px 28px;text-align:center;font-size:12px;line-height:1.6;color:#684761"><b>${name}</b><br>Mensagem automática. Precisa de ajuda? <a href="mailto:${contact}" style="color:#620853;font-weight:700">${contact}</a></td></tr></table></td></tr></table></body></html>`;
+  const safeImage = safeImageUrl(imageUrl);
+  const imageBlock = safeImage ? `<tr><td style="padding:0;background:#ffffff"><img src="${html(safeImage)}" width="620" alt="${html(title)}" style="display:block;width:100%;max-width:620px;height:auto;max-height:330px;object-fit:cover;border:0"></td></tr>` : '';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>@media only screen and (max-width:620px){.email-wrap{padding:12px 8px!important}.email-content{padding:24px 20px!important}.email-title{font-size:27px!important}}</style></head><body style="margin:0;background:#f5f1f6;font-family:Arial,Helvetica,sans-serif;color:#281225"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${html(intro)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1f6"><tr><td class="email-wrap" style="padding:28px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 8px 28px rgba(77,9,65,.10)"><tr><td align="center" style="background-color:#620853;background-image:linear-gradient(135deg,#510544 0%,#810b6d 100%);padding:25px 24px 28px;border-bottom:7px solid #fcd307"><div style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">${name}</div><div style="display:inline-block;background:#fcd307;color:#4a073f;border-radius:999px;padding:7px 13px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Atualização do pedido</div><h1 class="email-title" style="color:#ffffff;font-size:31px;line-height:1.15;margin:14px 0 0">${html(title)}</h1></td></tr>${imageBlock}<tr><td class="email-content" style="padding:30px 34px"><p style="font-size:17px;line-height:1.65;margin:0;color:#32142d">${html(intro)}</p>${content}</td></tr><tr><td style="background:#fff7c7;padding:20px 28px;text-align:center;font-size:12px;line-height:1.6;color:#684761"><b>${name}</b><br>Mensagem automática. Precisa de ajuda? <a href="mailto:${contact}" style="color:#620853;font-weight:700">${contact}</a></td></tr></table></td></tr></table></body></html>`;
 }
 
 function storeEmail(order: any, store: any, note: string) {
@@ -190,7 +204,17 @@ function customerEmail(order: any, store: any, event: string) {
       detail: 'Fale conosco caso precise de mais informações.'
     }
   };
-  const message = messages[event] || messages.confirmed;
+  const defaultMessage = messages[event] || messages.confirmed;
+  const customMessage = store.crmNotifications?.[event] || {};
+  const customTitle = messageVariables(customMessage.title || defaultMessage.title, order, customerFirstName);
+  const customIntro = messageVariables(customMessage.message || defaultMessage.intro, order, customerFirstName);
+  const message = {
+    ...defaultMessage,
+    title: customTitle,
+    intro: customIntro,
+    subject: customMessage.title ? `${customTitle} — ${order.order_number}` : defaultMessage.subject,
+    imageUrl: safeImageUrl(customMessage.imageUrl)
+  };
   const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:24px 0 18px;background:#fff9d9;border:1px solid #f8e77c;border-radius:18px"><tr><td width="64" style="padding:20px 0 20px 20px;vertical-align:top"><div style="width:48px;height:48px;line-height:48px;text-align:center;background:#620853;border-radius:50%;font-size:24px">${message.emoji}</div></td><td style="padding:20px;vertical-align:middle"><div style="font-size:11px;color:#7a536f;font-weight:700;letter-spacing:.8px;text-transform:uppercase">Status atual</div><div style="font-size:18px;color:#620853;font-weight:700;margin-top:4px">${html(message.status)}</div><div style="font-size:13px;line-height:1.5;color:#684761;margin-top:5px">${html(message.detail)}</div></td></tr></table><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#faf7fb;border:1px solid #eadfea;border-radius:16px"><tr><td style="padding:18px 20px"><div style="font-size:11px;color:#7a536f;font-weight:700;letter-spacing:.8px;text-transform:uppercase">Número do pedido</div><div style="font-size:21px;color:#620853;font-weight:700;margin-top:4px">${html(order.order_number)}</div></td><td style="padding:18px 20px;text-align:right"><div style="font-size:11px;color:#7a536f;font-weight:700;letter-spacing:.8px;text-transform:uppercase">Total</div><div style="font-size:21px;color:#620853;font-weight:700;margin-top:4px;white-space:nowrap">${html(money(order.total))}</div></td></tr></table><p style="font-size:13px;line-height:1.6;color:#74596f;text-align:center;margin:20px 0 0">Você receberá novos avisos conforme o pedido avançar.</p>`;
   return {
     to: customer.email || '',
@@ -198,7 +222,7 @@ function customerEmail(order: any, store: any, event: string) {
     subject: message.subject,
     preheader: message.intro,
     text: `${message.title}\n\n${message.intro}\n\nStatus: ${message.status}\n${message.detail}\n\nPedido: ${order.order_number}\nTotal: ${money(order.total)}\n\n${store.establishmentName || store.storeName || 'Açaí do Bom'}`,
-    html: emailFrame(message.title, message.intro, content, store)
+    html: emailFrame(message.title, message.intro, content, store, message.imageUrl)
   };
 }
 
@@ -273,6 +297,9 @@ Deno.serve(async req => {
 
   const integration = privateRow?.data || {};
   const store = settingsRow?.data || {};
+  if (event !== 'created' && store.crmNotifications?.[event]?.enabled === false) {
+    return json({ sent: false, configured: true, disabled: true, reason: 'notification_disabled', event: eventNames[event] });
+  }
   const webhookUrl = validateMakeUrl(integration.makeWebhookUrl);
   if (!integration.makeWebhookEnabled || !webhookUrl) {
     return json({ sent: false, configured: false, reason: 'make_disabled' });

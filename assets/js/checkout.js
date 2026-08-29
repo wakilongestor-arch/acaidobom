@@ -4,6 +4,7 @@
   let bound = false;
   let lastRestoredPhone = '';
   let phoneTimer = null;
+  let redirectTimer = null;
   const profileStorageKey = 'acai_customer_profiles_v1';
   const $ = selector => document.querySelector(selector);
 
@@ -67,6 +68,7 @@
   function open(nextCatalog) {
     if (window.MenuStoreStatus && !window.MenuStoreStatus.get().open) return false;
     catalog = nextCatalog;
+    clearTimeout(redirectTimer);
     step = 1;
     lastRestoredPhone = '';
     $('#returning-customer').hidden = true;
@@ -79,6 +81,7 @@
   }
 
   function close() {
+    clearTimeout(redirectTimer);
     $('#checkout-overlay').hidden = true;
     window.syncMenuScroll?.();
     $('#order-success').hidden = true;
@@ -87,6 +90,15 @@
     step = 1;
     resetLocationStatus();
     render();
+  }
+
+  function safeRedirectUrl(value) {
+    try {
+      const url = new URL(String(value || ''));
+      return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
+    } catch (error) {
+      return '';
+    }
   }
 
   function showLocationStatus(message, success = false) {
@@ -274,17 +286,25 @@
         ? `<div class="email-confirmation">✉ A confirmação será enviada automaticamente para <b>${String(result.customerEmail).replace(/[&<>"']/g, '')}</b> quando a loja confirmar o pedido.</div>`
         : `<div class="email-confirmation pending">✉ Seu e-mail foi salvo. A loja ainda precisa ativar a automação de confirmação.</div>`)
       : '';
+    const redirectUrl = catalog.settings.orderRedirectEnabled ? safeRedirectUrl(catalog.settings.orderRedirectUrl) : '';
+    const redirectNotice = redirectUrl ? '<div class="redirect-confirmation">Você será direcionado para a próxima página em alguns segundos.</div>' : '';
     box.innerHTML = `<span class="success-icon">✓</span><small>${title}</small>` +
       `<h2>Obrigado ${String(name).split(' ')[0]}!</h2><p>${message}</p>` +
       `<div class="order-number"><small>NÚMERO DO PEDIDO</small><b>${result.orderNumber}</b></div>` +
       emailNotice +
+      redirectNotice +
       (result.pixKey ? `<div class="pix"><span><small>CHAVE PIX</small><b>${result.pixKey}</b></span><button type="button" data-copy-pix>Copiar</button></div>` : '') +
       '<div class="success-links">' +
       (result.paymentUrl ? `<a href="${result.paymentUrl}" target="_blank" rel="noopener">Pagar on-line</a>` : '') +
       (result.whatsappUrl ? `<a class="wa" href="${result.whatsappUrl}" target="_blank" rel="noopener">Abrir WhatsApp novamente</a>` : '') +
+      (redirectUrl ? `<a class="redirect-link" href="${redirectUrl}">Continuar →</a>` : '') +
       '</div><button type="button" class="link-button" data-finish>Voltar ao cardápio</button>';
     box.querySelector('[data-copy-pix]')?.addEventListener('click', () => navigator.clipboard.writeText(result.pixKey));
     box.querySelector('[data-finish]').addEventListener('click', close);
+    if (redirectUrl) {
+      clearTimeout(redirectTimer);
+      redirectTimer = setTimeout(() => window.location.assign(redirectUrl), 3000);
+    }
   }
 
   function bind() {

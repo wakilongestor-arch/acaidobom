@@ -91,6 +91,7 @@ body.no-scroll{position:fixed;inset-inline:0;width:100%;overflow:hidden;overscro
 .secondary{border:1px solid var(--brand);background:#fff;color:var(--brand);cursor:pointer}
 .success-icon{background:var(--accent);color:var(--brand)}
 .success-links .wa{background:var(--brand)}
+.redirect-confirmation{margin-top:10px;padding:11px 13px;border:1px solid #c9b6cc;border-radius:10px;background:#f8f3f9;color:var(--brand);font-size:11px;font-weight:800;line-height:1.45}.success-links .redirect-link{background:var(--accent);color:var(--brand-dark)}
 .summary,.order-number{background:#fff9cf}
 
 @media(max-width:700px){

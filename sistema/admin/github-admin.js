@@ -25,6 +25,13 @@
     lanches: 'assets/images/categories/lanches.jpg',
     pasteis: 'assets/images/categories/pasteis.jpg'
   };
+  const crmNotificationDefaults = {
+    confirmed: { label: 'Pedido confirmado', enabled: true, title: 'Pedido confirmado! 🎉', message: 'Olá, {primeiro_nome}! Seu pedido foi confirmado e já está sendo preparado com todo carinho. Assim que sair para entrega, avisaremos você por e-mail.', imageUrl: '' },
+    preparing: { label: 'Em preparo', enabled: true, title: 'Preparando seu pedido 💜', message: '{primeiro_nome}, seu pedido já está sendo preparado com muito carinho.', imageUrl: '' },
+    out_for_delivery: { label: 'Saiu para entrega', enabled: true, title: 'Seu pedido está a caminho! 🛵', message: '{primeiro_nome}, seu pedido saiu para entrega. Fique de olho!', imageUrl: '' },
+    completed: { label: 'Pedido concluído', enabled: true, title: 'Pedido concluído! 💛', message: '{primeiro_nome}, seu pedido foi concluído. Obrigado por escolher o Açaí do Bom!', imageUrl: '' },
+    cancelled: { label: 'Pedido cancelado', enabled: true, title: 'Pedido cancelado', message: '{primeiro_nome}, o pedido {pedido} foi cancelado. Fale conosco se precisar de ajuda.', imageUrl: '' }
+  };
   const defaultHours = () => Object.fromEntries(weekDays.map(([key]) => [
     key, { enabled: true, open: '00:00', close: '23:59' }
   ]));
@@ -120,6 +127,26 @@
     set('accentColor', '#fcd307');
     set('brandBrightColor', '#620853');
     if (typeof settings.autoOpenWhatsApp !== 'boolean') set('autoOpenWhatsApp', true);
+    if (typeof settings.orderRedirectEnabled !== 'boolean') set('orderRedirectEnabled', false);
+    if (typeof settings.orderRedirectUrl !== 'string') set('orderRedirectUrl', '');
+    if (!settings.crmNotifications || typeof settings.crmNotifications !== 'object') {
+      settings.crmNotifications = {};
+      changed = true;
+    }
+    Object.entries(crmNotificationDefaults).forEach(([event, defaults]) => {
+      const current = settings.crmNotifications[event];
+      if (!current || typeof current !== 'object') {
+        settings.crmNotifications[event] = { enabled: defaults.enabled, title: defaults.title, message: defaults.message, imageUrl: '' };
+        changed = true;
+        return;
+      }
+      ['enabled', 'title', 'message', 'imageUrl'].forEach(key => {
+        if (typeof current[key] !== typeof defaults[key]) {
+          current[key] = defaults[key];
+          changed = true;
+        }
+      });
+    });
     if (!['auto', 'open', 'closed'].includes(settings.statusMode)) {
       set('statusMode', settings.open === false ? 'closed' : 'open');
     }
@@ -159,11 +186,13 @@
       '#gateway-provider': 'gatewayProvider', '#hero-eyebrow': 'heroEyebrow', '#hero-title': 'heroTitle',
       '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
       '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
-      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText'
+      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText',
+      '#order-redirect-url': 'orderRedirectUrl'
     };
     Object.entries(fields).forEach(([selector, key]) => { $(selector).value = settings[key] ?? ''; });
     $('#whatsapp-cloud-enabled').checked = Boolean(settings.whatsappCloudEnabled);
     $('#gateway-enabled').checked = Boolean(settings.gatewayEnabled);
+    $('#order-redirect-enabled').checked = Boolean(settings.orderRedirectEnabled);
     $('#store-status-mode').value = settings.statusMode || 'open';
     $('#make-webhook-enabled').checked = Boolean(privateSettings.makeWebhookEnabled);
     $('#make-webhook-url').value = privateSettings.makeWebhookUrl || '';
@@ -174,6 +203,7 @@
     $('#order-date').value = customOrderDate;
     customDashboardDate = customOrderDate;
     $('#dashboard-date').value = customDashboardDate;
+    renderCrmNotifications();
     renderHoursEditor();
     renderPreviews();
   }
@@ -192,7 +222,8 @@
       '#gateway-provider': 'gatewayProvider', '#hero-eyebrow': 'heroEyebrow', '#hero-title': 'heroTitle',
       '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
       '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
-      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText'
+      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText',
+      '#order-redirect-url': 'orderRedirectUrl'
     };
     Object.entries(fields).forEach(([selector, key]) => { settings[key] = $(selector).value.trim(); });
     settings.deliveryFee = Number($('#delivery-fee').value);
@@ -204,9 +235,47 @@
     settings.brandBrightColor = '#620853';
     settings.whatsappCloudEnabled = $('#whatsapp-cloud-enabled').checked;
     settings.gatewayEnabled = $('#gateway-enabled').checked;
+    settings.orderRedirectEnabled = $('#order-redirect-enabled').checked;
+    collectCrmNotifications();
     privateSettings.makeWebhookEnabled = $('#make-webhook-enabled').checked;
     privateSettings.makeWebhookUrl = $('#make-webhook-url').value.trim();
     collectHours();
+  }
+
+  function renderCrmNotifications() {
+    const settings = catalog.settings;
+    const notifications = settings.crmNotifications || (settings.crmNotifications = {});
+    const editor = $('#crm-notifications-editor');
+    editor.innerHTML = Object.entries(crmNotificationDefaults).map(([event, defaults]) => {
+      const current = { ...defaults, ...(notifications[event] || {}) };
+      notifications[event] = { enabled: current.enabled !== false, title: current.title, message: current.message, imageUrl: current.imageUrl || '' };
+      return `<article class="notification-editor ${current.enabled === false ? 'disabled' : ''}" data-notification="${event}"><header><div><small>ETAPA DO CRM</small><h4>${esc(defaults.label)}</h4></div><label class="notification-toggle"><input type="checkbox" data-notification-enabled ${current.enabled === false ? '' : 'checked'}> Enviar mensagem</label></header><div class="notification-body"><div class="notification-image">${current.imageUrl ? `<img src="${esc(preview(current.imageUrl))}" alt="">` : '<span>✉</span>'}</div><div class="notification-fields"><label>Título do e-mail<input data-notification-title value="${esc(current.title)}"></label><label>Mensagem<textarea data-notification-message rows="3">${esc(current.message)}</textarea></label><label>URL da imagem opcional<input data-notification-image value="${esc(current.imageUrl)}" placeholder="https://..."></label><div class="notification-image-actions"><label class="option-upload">Enviar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-notification-upload></label><button type="button" data-remove-notification-image ${current.imageUrl ? '' : 'hidden'}>Remover imagem</button></div></div></div></article>`;
+    }).join('');
+    editor.querySelectorAll('[data-notification]').forEach(card => {
+      const event = card.dataset.notification;
+      const entry = notifications[event];
+      card.querySelector('[data-notification-enabled]').onchange = change => {
+        entry.enabled = change.target.checked;
+        card.classList.toggle('disabled', !entry.enabled);
+      };
+      card.querySelector('[data-notification-title]').oninput = change => { entry.title = change.target.value; };
+      card.querySelector('[data-notification-message]').oninput = change => { entry.message = change.target.value; };
+      card.querySelector('[data-notification-image]').onchange = change => { entry.imageUrl = change.target.value.trim(); renderCrmNotifications(); };
+      card.querySelector('[data-notification-upload]').onchange = change => upload(change.target, 'notification', event);
+      card.querySelector('[data-remove-notification-image]').onclick = () => { entry.imageUrl = ''; renderCrmNotifications(); };
+    });
+  }
+
+  function collectCrmNotifications() {
+    const notifications = catalog.settings.crmNotifications || (catalog.settings.crmNotifications = {});
+    $('#crm-notifications-editor').querySelectorAll('[data-notification]').forEach(card => {
+      notifications[card.dataset.notification] = {
+        enabled: card.querySelector('[data-notification-enabled]').checked,
+        title: card.querySelector('[data-notification-title]').value.trim(),
+        message: card.querySelector('[data-notification-message]').value.trim(),
+        imageUrl: card.querySelector('[data-notification-image]').value.trim()
+      };
+    });
   }
 
   function updateMakeWebhookStatus(text, error = false) {
@@ -457,10 +526,12 @@
       const storeEmailText = storeEmailStatus === 'enviado' ? 'Loja: nota enviada' : storeEmailStatus === 'erro' ? 'Loja: erro no envio' : 'Loja: nota pendente';
       const customerEmailText = customerEmailStatus === 'enviado' ? 'Cliente: e-mail enviado' : customerEmailStatus === 'erro' ? 'Cliente: erro no envio' : 'Cliente: e-mail pendente';
       const customerEmailEvent = ({ confirmado: 'confirmed', preparando: 'preparing', saiu_entrega: 'out_for_delivery', concluido: 'completed', cancelado: 'cancelled' })[order.status];
+      const customerEmailEnabled = !customerEmailEvent || catalog.settings.crmNotifications?.[customerEmailEvent]?.enabled !== false;
+      const customerEmailDisplay = customerEmailEvent && !customerEmailEnabled ? 'Cliente: aviso desta etapa desativado' : customerEmailText;
       const retryStoreEmail = storeEmailStatus !== 'enviado'
         ? `<button type="button" class="retry-email" data-email-event="created" data-order-id="${esc(order.id)}">✉ Enviar nota à loja</button>`
         : '';
-      const retryCustomerEmail = customer.email && customerEmailEvent && customerEmailStatus !== 'enviado'
+      const retryCustomerEmail = customer.email && customerEmailEvent && customerEmailEnabled && customerEmailStatus !== 'enviado'
         ? `<button type="button" class="retry-email" data-email-event="${esc(customerEmailEvent)}" data-order-id="${esc(order.id)}">✉ Reenviar ao cliente</button>`
         : '';
       const nextButton = nextAction ? `<button type="button" class="next-order" data-fast-status="${esc(nextAction.status)}" data-order-id="${esc(order.id)}">${esc(nextAction.label)}</button>` : '';
@@ -471,7 +542,7 @@
       return `<article class="order-ticket status-${esc(order.status)}" data-order-card="${esc(order.id)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
         `<div class="customer"><span><small>CLIENTE</small><b>${esc(customer.name)}</b></span><span><small>WHATSAPP</small>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '-'}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span>${customer.email ? `<span><small>E-MAIL</small>${esc(customer.email)}</span>` : ''}</div>` +
         `<h4 class="order-section-title">ITENS DO PEDIDO</h4><div class="order-items">${itemsHtml}</div>${addressHtml}` +
-        `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span><span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span><span class="email-status ${emailClass(storeEmailStatus)}">${esc(storeEmailText)}</span>${customer.email ? `<span class="email-status ${emailClass(customerEmailStatus)}">${esc(customerEmailText)}</span>` : ''}</div>` +
+        `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span><span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span><span class="email-status ${emailClass(storeEmailStatus)}">${esc(storeEmailText)}</span>${customer.email ? `<span class="email-status ${customerEmailEnabled ? emailClass(customerEmailStatus) : 'disabled'}">${esc(customerEmailDisplay)}</span>` : ''}</div>` +
         (order.notes ? `<div class="order-notes"><b>Observações gerais:</b> ${esc(order.notes)}</div>` : '') +
         `<div class="order-totals"><div><span>Subtotal</span><b>${money(order.subtotal)}</b></div><div><span>Taxa de entrega</span><b>${money(order.delivery_fee)}</b></div><div class="grand-total"><span>TOTAL</span><b>${money(order.total)}</b></div></div>` +
         `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">Ver nota completa</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${nextButton}${paymentButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
@@ -552,7 +623,7 @@
       concluido: 'completed', cancelado: 'cancelled'
     };
     const emailEvents = [];
-    if (status !== order.status && statusEvents[status]) emailEvents.push(statusEvents[status]);
+    if (status !== order.status && statusEvents[status] && catalog.settings.crmNotifications?.[statusEvents[status]]?.enabled !== false) emailEvents.push(statusEvents[status]);
     if (paymentStatus !== order.payment_status && paymentStatus === 'pago' && !emailEvents.includes('confirmed')) emailEvents.push('payment_paid');
     if (paymentStatus !== order.payment_status && paymentStatus === 'estornado') emailEvents.push('payment_refunded');
     try {
@@ -757,7 +828,7 @@
     holder?.classList.add('busy');
     try {
       notice('Otimizando e enviando imagem...');
-      const folders = { logo: 'logo', banner: 'banner', product: 'produtos', category: 'categorias', option: 'acompanhamentos' };
+      const folders = { logo: 'logo', banner: 'banner', product: 'produtos', category: 'categorias', option: 'acompanhamentos', notification: 'mensagens' };
       const url = await SupabaseStore.uploadImage(file, folders[target] || 'geral');
       if (target === 'logo') { catalog.settings.logoUrl = url; $('#logo-url').value = url; }
       if (target === 'banner') { catalog.settings.bannerUrl = url; $('#banner-url').value = url; }
@@ -770,6 +841,11 @@
         const option = editing.addonGroups.flatMap(group => group.options || []).find(item => item.id === referenceId);
         if (option) option.imageUrl = url;
         renderGroups();
+      }
+      if (target === 'notification') {
+        const notification = catalog.settings.crmNotifications?.[referenceId];
+        if (notification) notification.imageUrl = url;
+        renderCrmNotifications();
       }
       renderPreviews();
       if (target === 'logo' || target === 'banner' || target === 'category') {
