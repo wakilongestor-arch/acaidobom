@@ -181,14 +181,20 @@
     return { notifications };
   }
 
-  async function deleteOrder(id) {
+  async function deleteOrders(ids) {
     const db = getClient();
     if (!db) throw new Error('Supabase não configurado.');
-    const { error } = await db.from('orders').delete().eq('id', id);
+    const targets = [...new Set((ids || []).map(String).filter(Boolean))].slice(0, 1000);
+    if (!targets.length) return;
+    const { error } = await db.from('orders').delete().in('id', targets);
     if (error && /permission|policy|denied/i.test(error.message || '')) {
       throw new Error('Execute a migração 003 no Supabase para liberar a exclusão segura de pedidos.');
     }
     throwIfError(error, 'Não foi possível excluir o pedido.');
+  }
+
+  async function deleteOrder(id) {
+    return deleteOrders([id]);
   }
 
   async function optimizeImage(file) {
@@ -282,6 +288,7 @@
     listOrders,
     updateOrder,
     deleteOrder,
+    deleteOrders,
     uploadImage,
     signIn,
     getSession,

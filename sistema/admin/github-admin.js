@@ -8,12 +8,14 @@
   let orders = [];
   let editing = null;
   let deleting = null;
-  let deletingOrder = null;
+  let deletingOrderIds = [];
   let orderRefreshTimer = null;
   let knownOrderIds = new Set();
   let orderView = 'board';
   let orderPeriod = 'today';
   let customOrderDate = '';
+  let dashboardPeriod = 'today';
+  let customDashboardDate = '';
   const weekDays = [
     ['sun', 'Domingo'], ['mon', 'Segunda'], ['tue', 'Terça'], ['wed', 'Quarta'],
     ['thu', 'Quinta'], ['fri', 'Sexta'], ['sat', 'Sábado']
@@ -98,6 +100,15 @@
     if (!settings.locationName) set('locationName', settings.city || 'Ji-Paraná - RO');
     if (!settings.contactPhone) set('contactPhone', '(69) 9381-7951');
     if (!settings.publicEmail) set('publicEmail', 'contato@acaidobom.com.br');
+    if (!settings.heroEyebrow) set('heroEyebrow', '✦ DO SEU JEITO');
+    if (!settings.heroTitle) set('heroTitle', 'O açaí que');
+    if (!settings.heroHighlight) set('heroHighlight', 'dá vontade.');
+    if (!settings.menuEyebrow) set('menuEyebrow', 'ESCOLHA O SEU');
+    if (!settings.menuTitle) set('menuTitle', 'Cardápio');
+    if (!settings.searchPlaceholder) set('searchPlaceholder', 'Buscar produto ou acompanhamento');
+    if (!settings.whatsappEyebrow) set('whatsappEyebrow', 'PREFERE PEDIR DIRETO?');
+    if (!settings.whatsappTitle) set('whatsappTitle', 'Fale com a gente no WhatsApp');
+    if (!settings.whatsappButtonText) set('whatsappButtonText', 'CHAMAR AGORA →');
     if (typeof settings.cnpj !== 'string') set('cnpj', '');
     if (typeof settings.instagramUrl !== 'string') set('instagramUrl', '');
     if (typeof settings.facebookUrl !== 'string') set('facebookUrl', '');
@@ -145,7 +156,10 @@
       '#establishment-name': 'establishmentName', '#location-name': 'locationName',
       '#store-cnpj': 'cnpj', '#contact-phone': 'contactPhone', '#public-email': 'publicEmail',
       '#instagram-url': 'instagramUrl', '#facebook-url': 'facebookUrl', '#tiktok-url': 'tiktokUrl',
-      '#gateway-provider': 'gatewayProvider'
+      '#gateway-provider': 'gatewayProvider', '#hero-eyebrow': 'heroEyebrow', '#hero-title': 'heroTitle',
+      '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
+      '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
+      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText'
     };
     Object.entries(fields).forEach(([selector, key]) => { $(selector).value = settings[key] ?? ''; });
     $('#whatsapp-cloud-enabled').checked = Boolean(settings.whatsappCloudEnabled);
@@ -158,6 +172,8 @@
       : 'Execute a migração 003 no Supabase para liberar esta integração.', !privateSettings.available);
     customOrderDate = localDateKey(new Date());
     $('#order-date').value = customOrderDate;
+    customDashboardDate = customOrderDate;
+    $('#dashboard-date').value = customDashboardDate;
     renderHoursEditor();
     renderPreviews();
   }
@@ -173,7 +189,10 @@
       '#establishment-name': 'establishmentName', '#location-name': 'locationName',
       '#store-cnpj': 'cnpj', '#contact-phone': 'contactPhone', '#public-email': 'publicEmail',
       '#instagram-url': 'instagramUrl', '#facebook-url': 'facebookUrl', '#tiktok-url': 'tiktokUrl',
-      '#gateway-provider': 'gatewayProvider'
+      '#gateway-provider': 'gatewayProvider', '#hero-eyebrow': 'heroEyebrow', '#hero-title': 'heroTitle',
+      '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
+      '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
+      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText'
     };
     Object.entries(fields).forEach(([selector, key]) => { settings[key] = $(selector).value.trim(); });
     settings.deliveryFee = Number($('#delivery-fee').value);
@@ -278,14 +297,14 @@
     return date.toISOString().slice(0, 10);
   }
 
-  function filteredOrders() {
-    if (orderPeriod === 'all') return orders;
+  function ordersForPeriod(period, customDate) {
+    if (period === 'all') return orders;
     const today = localDateKey(new Date());
-    const target = orderPeriod === 'yesterday' ? shiftDateKey(today, -1) : orderPeriod === 'custom' ? customOrderDate : today;
-    if (orderPeriod === 'today' || orderPeriod === 'yesterday' || orderPeriod === 'custom') {
+    const target = period === 'yesterday' ? shiftDateKey(today, -1) : period === 'custom' ? customDate : today;
+    if (period === 'today' || period === 'yesterday' || period === 'custom') {
       return orders.filter(order => localDateKey(order.created_at || order.createdAt) === target);
     }
-    const days = orderPeriod === '30days' ? 29 : 6;
+    const days = period === '30days' ? 29 : 6;
     const start = shiftDateKey(today, -days);
     return orders.filter(order => {
       const key = localDateKey(order.created_at || order.createdAt);
@@ -293,9 +312,17 @@
     });
   }
 
+  function filteredOrders() {
+    return ordersForPeriod(orderPeriod, customOrderDate);
+  }
+
+  function periodLabel(period, customDate) {
+    return ({ today: 'hoje', yesterday: 'ontem', '7days': 'nos últimos 7 dias', '30days': 'nos últimos 30 dias', all: 'em todo o histórico' })[period]
+      || (customDate ? `em ${customDate.split('-').reverse().join('/')}` : 'na data escolhida');
+  }
+
   function orderPeriodLabel() {
-    return ({ today: 'hoje', yesterday: 'ontem', '7days': 'nos últimos 7 dias', '30days': 'nos últimos 30 dias', all: 'em todo o histórico' })[orderPeriod]
-      || (customOrderDate ? `em ${customOrderDate.split('-').reverse().join('/')}` : 'na data escolhida');
+    return periodLabel(orderPeriod, customOrderDate);
   }
 
   function renderAll() {
@@ -307,23 +334,35 @@
   }
 
   function renderDashboard() {
-    const today = localDateKey(new Date());
-    const todays = orders.filter(order => {
-      const date = new Date(order.created_at || order.createdAt);
-      return !Number.isNaN(date.valueOf()) && localDateKey(date) === today;
-    });
+    const periodOrders = ordersForPeriod(dashboardPeriod, customDashboardDate);
+    const validOrders = periodOrders.filter(order => order.status !== 'cancelado');
     const pending = orders.filter(order => ['novo', 'confirmado', 'preparando', 'saiu_entrega'].includes(order.status));
-    $('#stat-orders').textContent = todays.length;
-    $('#stat-revenue').textContent = money(todays.reduce((sum, order) => sum + Number(order.total), 0));
+    const revenue = validOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const average = validOrders.length ? revenue / validOrders.length : 0;
+    $('#stat-orders').textContent = validOrders.length;
+    $('#stat-revenue').textContent = money(revenue);
+    $('#stat-average').textContent = money(average);
     $('#stat-pending').textContent = pending.length;
     $('#pending-badge').textContent = pending.length;
-    $('#stat-products').textContent = catalog.products.filter(product => product.active).length;
-    $('#recent-orders').innerHTML = orders.length
-      ? orders.slice(0, 6).map(order => `<div class="recent"><span><b>${esc(order.order_number || order.number)}</b><small>${esc(order.customer?.name || '')}</small></span><strong>${money(order.total)}</strong><em data-status="${esc(order.status)}">${esc(order.status)}</em></div>`).join('')
-      : '<div class="empty-admin">Nenhum pedido ainda.</div>';
+    $('#dashboard-revenue-total').textContent = money(revenue);
+    $('#revenue-chart-title').textContent = `Movimento ${periodLabel(dashboardPeriod, customDashboardDate)}`;
+    $('#recent-orders').innerHTML = pending.length
+      ? pending.slice(0, 8).map(order => `<div class="recent"><span><b>${esc(order.order_number || order.number)}</b><small>${esc(order.customer?.name || '')}</small></span><strong>${money(order.total)}</strong><em data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</em></div>`).join('')
+      : '<div class="empty-admin compact">Nenhum pedido em andamento.</div>';
+
+    const revenueByDate = new Map();
+    validOrders.forEach(order => {
+      const key = localDateKey(order.created_at || order.createdAt);
+      if (key) revenueByDate.set(key, (revenueByDate.get(key) || 0) + Number(order.total || 0));
+    });
+    const series = [...revenueByDate.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-10);
+    const highest = Math.max(1, ...series.map(([, value]) => value));
+    $('#revenue-chart').innerHTML = series.length
+      ? series.map(([date, value]) => `<div class="revenue-bar" title="${esc(date.split('-').reverse().join('/'))}: ${esc(money(value))}"><b>${esc(money(value))}</b><span><i style="height:${Math.max(8, Math.round((value / highest) * 100))}%"></i></span><small>${esc(date.slice(5).split('-').reverse().join('/'))}</small></div>`).join('')
+      : '<div class="empty-admin compact">Ainda não há faturamento neste período.</div>';
     const settings = catalog.settings;
     const modeLabels = { auto: 'Automático por horário', open: 'Aberta manualmente', closed: 'Fechada manualmente' };
-    $('#operation-summary').innerHTML = `<p><span>Funcionamento</span><b>${esc(modeLabels[settings.statusMode] || modeLabels.open)}</b></p><p><span>Pedido mínimo</span><b>${money(settings.minOrder)}</b></p><p><span>Taxa de entrega</span><b>${money(settings.deliveryFee)}</b></p><p><span>Tempo estimado</span><b>${esc(settings.estimatedTime)}</b></p><p><span>WhatsApp</span><b>${esc(settings.whatsapp)}</b></p>`;
+    $('#operation-summary').innerHTML = `<p><span>Funcionamento</span><b>${esc(modeLabels[settings.statusMode] || modeLabels.open)}</b></p><p><span>Produtos ativos</span><b>${catalog.products.filter(product => product.active).length}</b></p><p><span>Cancelados no período</span><b>${periodOrders.filter(order => order.status === 'cancelado').length}</b></p><p><span>Pedido mínimo</span><b>${money(settings.minOrder)}</b></p><p><span>Taxa de entrega</span><b>${money(settings.deliveryFee)}</b></p><p><span>Tempo estimado</span><b>${esc(settings.estimatedTime)}</b></p>`;
   }
 
   function statusLabel(status) {
@@ -384,6 +423,9 @@
   function renderOrders() {
     const box = $('#orders-list');
     const visibleOrders = filteredOrders();
+    const cancelledCount = orders.filter(order => order.status === 'cancelado').length;
+    $('#delete-cancelled-orders').hidden = cancelledCount === 0;
+    $('#delete-cancelled-orders').textContent = `🗑 Apagar cancelados (${cancelledCount})`;
     $('#order-filter-summary').textContent = `${visibleOrders.length} pedido${visibleOrders.length === 1 ? '' : 's'} ${orderPeriodLabel()}`;
     if (!visibleOrders.length) {
       box.className = 'orders';
@@ -553,24 +595,36 @@
   function openOrderDelete(id) {
     const order = orders.find(item => String(item.id) === String(id));
     if (!order) return;
-    deletingOrder = id;
+    deletingOrderIds = [id];
     $('#order-delete-message').textContent = `Excluir ${order.order_number}? O pedido e o histórico de automações serão removidos definitivamente.`;
     $('#confirm-order-delete').hidden = false;
     document.body.classList.add('dialog-open');
   }
 
+  function openCancelledOrdersDelete() {
+    deletingOrderIds = orders.filter(order => order.status === 'cancelado').map(order => order.id);
+    if (!deletingOrderIds.length) {
+      notice('Não há pedidos cancelados para apagar.');
+      return;
+    }
+    $('#order-delete-message').textContent = `Apagar ${deletingOrderIds.length} pedido${deletingOrderIds.length === 1 ? '' : 's'} cancelado${deletingOrderIds.length === 1 ? '' : 's'}? Esta ação remove definitivamente os pedidos e os históricos de automação relacionados.`;
+    $('#confirm-order-delete').hidden = false;
+    document.body.classList.add('dialog-open');
+  }
+
   async function deleteSelectedOrder() {
-    if (!deletingOrder) return;
+    if (!deletingOrderIds.length) return;
     const button = $('#do-order-delete');
     button.disabled = true;
     button.textContent = 'Excluindo...';
     try {
-      await SupabaseStore.deleteOrder(deletingOrder);
-      orders = orders.filter(order => String(order.id) !== String(deletingOrder));
-      knownOrderIds.delete(String(deletingOrder));
+      await SupabaseStore.deleteOrders(deletingOrderIds);
+      const deleted = new Set(deletingOrderIds.map(String));
+      orders = orders.filter(order => !deleted.has(String(order.id)));
+      deletingOrderIds.forEach(id => knownOrderIds.delete(String(id)));
       renderDashboard();
       renderOrders();
-      notice('Pedido excluído com segurança.');
+      notice(deleted.size === 1 ? 'Pedido excluído com segurança.' : `${deleted.size} pedidos cancelados foram apagados.`);
     } catch (error) {
       notice(error.message, true);
     } finally {
@@ -578,7 +632,7 @@
       button.textContent = 'Excluir pedido';
       $('#confirm-order-delete').hidden = true;
       document.body.classList.remove('dialog-open');
-      deletingOrder = null;
+      deletingOrderIds = [];
     }
   }
 
@@ -588,7 +642,7 @@
       const category = catalog.categories.find(item => item.id === product.categoryId);
       const imageUrl = product.imageUrl || category?.imageUrl || '';
       return `<article><div class="product-thumb">${imageUrl ? `<img src="${esc(preview(imageUrl))}" alt="">` : '⬡'}${!product.active ? '<b>INATIVO</b>' : ''}</div>` +
-        `<div><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong><p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
+        `<div><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong>${product.freeShippingText ? `<em class="admin-free-shipping">● ${esc(product.freeShippingText)}</em>` : ''}<p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
         `<footer><button data-edit="${esc(product.id)}">Editar</button><button data-delete="${esc(product.id)}">🗑</button></footer></article>`;
     }).join('');
     $('#admin-products').querySelectorAll('[data-edit]').forEach(button => { button.onclick = () => openEditor(button.dataset.edit); });
@@ -641,13 +695,14 @@
   function openEditor(id) {
     editing = id
       ? structuredClone(catalog.products.find(product => product.id === id))
-      : { id: crypto.randomUUID(), name: '', description: '', categoryId: catalog.categories[0]?.id || 'destaques', price: 0, imageUrl: '', featured: false, active: true, badge: '', addonGroups: [] };
+      : { id: crypto.randomUUID(), name: '', description: '', categoryId: catalog.categories[0]?.id || 'destaques', price: 0, imageUrl: '', featured: false, active: true, badge: '', freeShippingText: '', addonGroups: [] };
     editing.addonGroups = editing.addonGroups || [];
     $('#editor-title').textContent = editing.name || 'Novo produto';
     $('#edit-name').value = editing.name;
     $('#edit-description').value = editing.description;
     $('#edit-price').value = editing.price;
     $('#edit-badge').value = editing.badge || '';
+    $('#edit-free-shipping').value = editing.freeShippingText || '';
     $('#edit-image').value = editing.imageUrl || '';
     $('#edit-active').checked = editing.active;
     $('#edit-featured').checked = editing.featured;
@@ -674,7 +729,7 @@
     $('#addon-groups').innerHTML = (editing.addonGroups || []).map(group => {
       group.options = group.options || [];
       return `<article data-group="${esc(group.id)}"><header><input value="${esc(group.name)}" data-group-name><label><input type="checkbox" data-group-required ${group.required ? 'checked' : ''}> Obrigatório</label><label>Máx.<input type="number" min="1" value="${group.max || 1}" data-group-max></label><button type="button" data-remove-group>×</button></header>` +
-        `<div class="options">${group.options.map(option => `<div data-option="${esc(option.id)}"><input value="${esc(option.name)}" data-option-name placeholder="Nome do adicional"><input type="number" step=".01" value="${Number(option.price || 0)}" data-option-price><button type="button" data-remove-option>🗑</button></div>`).join('')}<button type="button" data-add-option>+ Adicionar opção</button></div></article>`;
+        `<div class="options">${group.options.map(option => `<div class="option-row" data-option="${esc(option.id)}"><div class="option-thumb">${option.imageUrl ? `<img src="${esc(preview(option.imageUrl))}" alt="">` : '🥣'}</div><div class="option-fields"><input value="${esc(option.name)}" data-option-name placeholder="Nome do acompanhamento"><input value="${esc(option.imageUrl || '')}" data-option-image placeholder="URL da imagem"></div><label class="option-upload">Trocar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-option-upload></label><input class="option-price" aria-label="Preço adicional" type="number" step=".01" value="${Number(option.price || 0)}" data-option-price><button type="button" data-remove-option aria-label="Excluir acompanhamento">🗑</button></div>`).join('')}<button type="button" data-add-option>+ Adicionar opção</button></div></article>`;
     }).join('');
     $('#addon-groups').querySelectorAll('[data-group]').forEach(card => {
       const group = editing.addonGroups.find(item => item.id === card.dataset.group);
@@ -682,17 +737,19 @@
       card.querySelector('[data-group-required]').onchange = event => { group.required = event.target.checked; group.min = event.target.checked ? 1 : 0; };
       card.querySelector('[data-group-max]').oninput = event => { group.max = Math.max(1, Number(event.target.value)); };
       card.querySelector('[data-remove-group]').onclick = () => { editing.addonGroups = editing.addonGroups.filter(item => item.id !== group.id); renderGroups(); };
-      card.querySelector('[data-add-option]').onclick = () => { group.options.push({ id: crypto.randomUUID(), name: '', price: 0, available: true }); renderGroups(); };
+      card.querySelector('[data-add-option]').onclick = () => { group.options.push({ id: crypto.randomUUID(), name: '', price: 0, imageUrl: '', available: true }); renderGroups(); };
       card.querySelectorAll('[data-option]').forEach(row => {
         const option = group.options.find(item => item.id === row.dataset.option);
         row.querySelector('[data-option-name]').oninput = event => { option.name = event.target.value; };
         row.querySelector('[data-option-price]').oninput = event => { option.price = Number(event.target.value); };
+        row.querySelector('[data-option-image]').onchange = event => { option.imageUrl = event.target.value.trim(); renderGroups(); };
+        row.querySelector('[data-option-upload]').onchange = event => upload(event.target, 'option', option.id);
         row.querySelector('[data-remove-option]').onclick = () => { group.options = group.options.filter(item => item.id !== option.id); renderGroups(); };
       });
     });
   }
 
-  async function upload(input, target, categoryId = '') {
+  async function upload(input, target, referenceId = '') {
     const file = input.files[0];
     if (!file) return;
     const holder = input.closest('label');
@@ -700,14 +757,19 @@
     holder?.classList.add('busy');
     try {
       notice('Otimizando e enviando imagem...');
-      const folders = { logo: 'logo', banner: 'banner', product: 'produtos', category: 'categorias' };
+      const folders = { logo: 'logo', banner: 'banner', product: 'produtos', category: 'categorias', option: 'acompanhamentos' };
       const url = await SupabaseStore.uploadImage(file, folders[target] || 'geral');
       if (target === 'logo') { catalog.settings.logoUrl = url; $('#logo-url').value = url; }
       if (target === 'banner') { catalog.settings.bannerUrl = url; $('#banner-url').value = url; }
       if (target === 'product' && editing) { editing.imageUrl = url; $('#edit-image').value = url; renderProductPhoto(); }
       if (target === 'category') {
-        const category = catalog.categories.find(item => item.id === categoryId);
+        const category = catalog.categories.find(item => item.id === referenceId);
         if (category) category.imageUrl = url;
+      }
+      if (target === 'option' && editing) {
+        const option = editing.addonGroups.flatMap(group => group.options || []).find(item => item.id === referenceId);
+        if (option) option.imageUrl = url;
+        renderGroups();
       }
       renderPreviews();
       if (target === 'logo' || target === 'banner' || target === 'category') {
@@ -820,6 +882,15 @@
     });
     $('#save-all').onclick = saveAll;
     $('#refresh-orders').onclick = () => refreshOrders(true);
+    $('#dashboard-period').onchange = event => {
+      dashboardPeriod = event.target.value;
+      $('#dashboard-date-field').hidden = dashboardPeriod !== 'custom';
+      renderDashboard();
+    };
+    $('#dashboard-date').onchange = event => {
+      customDashboardDate = event.target.value || localDateKey(new Date());
+      if (dashboardPeriod === 'custom') renderDashboard();
+    };
     $('#order-period').onchange = event => {
       orderPeriod = event.target.value;
       $('#order-date-field').hidden = orderPeriod !== 'custom';
@@ -829,6 +900,7 @@
       customOrderDate = event.target.value || localDateKey(new Date());
       if (orderPeriod === 'custom') renderOrders();
     };
+    $('#delete-cancelled-orders').onclick = openCancelledOrdersDelete;
     $('#order-board-view').onclick = () => {
       orderView = 'board';
       $('#order-board-view').classList.add('active');
@@ -853,6 +925,7 @@
       editing.description = $('#edit-description').value.trim();
       editing.price = Number($('#edit-price').value);
       editing.badge = $('#edit-badge').value.trim();
+      editing.freeShippingText = $('#edit-free-shipping').value.trim();
       editing.imageUrl = $('#edit-image').value.trim();
       editing.active = $('#edit-active').checked;
       editing.featured = $('#edit-featured').checked;
@@ -882,7 +955,7 @@
     $('#cancel-order-delete').onclick = () => {
       $('#confirm-order-delete').hidden = true;
       document.body.classList.remove('dialog-open');
-      deletingOrder = null;
+      deletingOrderIds = [];
     };
     $('#do-order-delete').onclick = deleteSelectedOrder;
     $('#do-delete').onclick = async () => {

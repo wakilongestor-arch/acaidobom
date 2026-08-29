@@ -43,6 +43,15 @@
     settings.locationName = settings.locationName || settings.city || 'Ji-Paraná - RO';
     settings.contactPhone = settings.contactPhone || '(69) 9381-7951';
     settings.publicEmail = settings.publicEmail || 'contato@acaidobom.com.br';
+    settings.heroEyebrow = settings.heroEyebrow || '✦ DO SEU JEITO';
+    settings.heroTitle = settings.heroTitle || 'O açaí que';
+    settings.heroHighlight = settings.heroHighlight || 'dá vontade.';
+    settings.menuEyebrow = settings.menuEyebrow || 'ESCOLHA O SEU';
+    settings.menuTitle = settings.menuTitle || 'Cardápio';
+    settings.searchPlaceholder = settings.searchPlaceholder || 'Buscar produto ou acompanhamento';
+    settings.whatsappEyebrow = settings.whatsappEyebrow || 'PREFERE PEDIR DIRETO?';
+    settings.whatsappTitle = settings.whatsappTitle || 'Fale com a gente no WhatsApp';
+    settings.whatsappButtonText = settings.whatsappButtonText || 'CHAMAR AGORA →';
     settings.cnpj = settings.cnpj || '';
     settings.instagramUrl = settings.instagramUrl || '';
     settings.facebookUrl = settings.facebookUrl || '';
@@ -65,6 +74,15 @@
     renderLogo(settings.logoUrl, settings.storeName);
     $$('[data-store-name]').forEach(element => { element.textContent = settings.storeName; });
     $('#store-tagline').textContent = settings.tagline;
+    $('#hero-eyebrow').textContent = settings.heroEyebrow;
+    $('#hero-title').textContent = settings.heroTitle;
+    $('#hero-highlight').textContent = settings.heroHighlight;
+    $('#menu-eyebrow').textContent = settings.menuEyebrow;
+    $('#menu-title').textContent = settings.menuTitle;
+    $('#search').placeholder = settings.searchPlaceholder;
+    $('#whatsapp-eyebrow').textContent = settings.whatsappEyebrow;
+    $('#whatsapp-title').textContent = settings.whatsappTitle;
+    $('#whatsapp-button-text').textContent = settings.whatsappButtonText;
     $('#store-city').textContent = settings.city;
     $('#store-time').textContent = settings.estimatedTime;
     $('#store-fee').textContent = MenuAPI.money(settings.deliveryFee);
@@ -159,11 +177,20 @@
   }
 
   function list() {
+    const normalizedQuery = normalizeSearch(query);
     return catalog.products
       .filter(product => product.active)
-      .filter(product => query
-        ? (product.name + ' ' + product.description).toLowerCase().includes(query.toLowerCase())
+      .filter(product => normalizedQuery
+        ? normalizeSearch([
+          product.name, product.description, product.badge, product.freeShippingText,
+          catalog.categories.find(category => category.id === product.categoryId)?.name,
+          ...(product.addonGroups || []).flatMap(group => [group.name, ...(group.options || []).map(option => option.name)])
+        ].filter(Boolean).join(' ')).includes(normalizedQuery)
         : (active === 'destaques' ? product.featured : product.categoryId === active));
+  }
+
+  function normalizeSearch(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
   function renderProducts() {
@@ -176,8 +203,10 @@
     container.innerHTML = products.map(product => {
       const category = catalog.categories.find(item => item.id === product.categoryId) || {};
       const imageUrl = product.imageUrl || category.imageUrl || '';
+      const freeShipping = String(product.freeShippingText || '').trim();
       return '<article class="product-card"><button type="button" data-product="' + escape(product.id) + '">' +
         '<div class="product-copy"><small>' + escape(category.name || 'Açaí do Bom') + '</small><h3>' + escape(product.name) + '</h3><p>' + escape(product.description) + '</p>' +
+        (freeShipping ? '<em class="free-shipping">● ' + escape(freeShipping) + '</em>' : '') +
         '<footer><b>' + MenuAPI.money(product.price) + '</b><span aria-hidden="true">＋</span></footer></div>' +
         '<div class="product-media">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + (product.badge ? '<b>' + escape(product.badge) + '</b>' : '') + '</div>' +
       '</button></article>';
@@ -232,7 +261,6 @@
     const addonList = $('#addon-list');
     $('#product-step-label').textContent = 'Etapa ' + (productStep + 1) + ' de ' + total;
     $('#product-step-title').textContent = isReview ? 'Revise e confirme' : group.name;
-    $('#product-step-progress').style.width = (((productStep + 1) / total) * 100) + '%';
     $('#product-step-back').textContent = productStep ? '← Voltar' : 'Cancelar';
     $('#product-notes').hidden = !isReview;
     $('#product-quantity').hidden = !isReview;
@@ -564,7 +592,10 @@
     $('#cart').setAttribute('aria-hidden', 'false');
     $('#cart-backdrop').hidden = false;
     syncBodyLock();
-    requestAnimationFrame(() => $('[data-close-cart]')?.focus());
+    requestAnimationFrame(() => {
+      $('#cart-items').scrollTop = 0;
+      $('[data-close-cart]')?.focus();
+    });
   }
 
   function closeCart() {
@@ -577,7 +608,16 @@
   function bind() {
     $('#search').addEventListener('input', event => {
       query = event.target.value;
+      $('#clear-search').hidden = !query;
       renderProducts();
+    });
+    $('#focus-search').addEventListener('click', () => $('#search').focus());
+    $('#clear-search').addEventListener('click', () => {
+      query = '';
+      $('#search').value = '';
+      $('#clear-search').hidden = true;
+      renderProducts();
+      $('#search').focus();
     });
     $('#categories').addEventListener('click', event => {
       const button = event.target.closest('[data-category]');
@@ -585,6 +625,7 @@
       active = button.dataset.category;
       query = '';
       $('#search').value = '';
+      $('#clear-search').hidden = true;
       renderCategories();
       renderProducts();
     });

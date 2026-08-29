@@ -43,8 +43,8 @@
       <img id="hero-image" alt="Açaí cremoso com frutas e granola">
       <div class="hero-shade"></div>
       <div class="hero-copy">
-        <p>✦ DO SEU JEITO</p>
-        <h1>O açaí que<br><em>dá vontade.</em></h1>
+        <p id="hero-eyebrow">✦ DO SEU JEITO</p>
+        <h1><span id="hero-title">O açaí que</span><br><em id="hero-highlight">dá vontade.</em></h1>
         <span id="store-tagline">Seu açaí do seu jeito, rápido e caprichado</span>
         <div><a class="cta" href="#cardapio">VER CARDÁPIO →</a><span class="open-status" id="store-status">Aberto agora</span></div>
       </div>
@@ -58,12 +58,12 @@
     </section>
 
     <section class="menu-section" id="cardapio">
-      <header class="section-title"><div><small>ESCOLHA O SEU</small><h2>Cardápio</h2></div><label class="search">⌕<input id="search" type="search" placeholder="Buscar no cardápio"></label></header>
+      <header class="section-title"><div><small id="menu-eyebrow">ESCOLHA O SEU</small><h2 id="menu-title">Cardápio</h2></div><div class="search" role="search"><button type="button" id="focus-search" aria-label="Buscar produto">⌕</button><input id="search" type="search" autocomplete="off" placeholder="Buscar produto ou acompanhamento"><button type="button" id="clear-search" aria-label="Limpar busca" hidden>×</button></div></header>
       <div class="categories" id="categories" role="tablist"></div>
       <div class="products" id="products"></div>
     </section>
 
-    <section class="whatsapp-callout"><div><i>◉</i><span><small>PREFERE PEDIR DIRETO?</small><b>Fale com a gente no WhatsApp</b></span></div><a id="callout-whatsapp" target="_blank" rel="noopener">CHAMAR AGORA →</a></section>
+    <section class="whatsapp-callout"><div><i>◉</i><span><small id="whatsapp-eyebrow">PREFERE PEDIR DIRETO?</small><b id="whatsapp-title">Fale com a gente no WhatsApp</b></span></div><a id="callout-whatsapp" target="_blank" rel="noopener"><span id="whatsapp-button-text">CHAMAR AGORA →</span></a></section>
   </main>
 
   <footer class="footer">
@@ -79,7 +79,7 @@
     <section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-name">
       <button class="modal-close" data-close-product aria-label="Fechar">×</button>
       <div class="product-modal-head"><img id="product-image" alt=""><div><h2 id="product-name"></h2><p id="product-description"></p><b id="product-base-price"></b></div></div>
-      <header class="product-step-head"><div><small id="product-step-label">Etapa 1 de 1</small><b id="product-step-title">Escolha as opções</b></div><span aria-hidden="true"><i id="product-step-progress"></i></span></header>
+      <header class="product-step-head"><div><small id="product-step-label">Etapa 1 de 1</small><b id="product-step-title">Escolha as opções</b></div></header>
       <div class="addon-list" id="addon-list" aria-live="polite"></div>
       <label class="field notes" id="product-notes" hidden><span>Alguma observação?</span><textarea id="item-notes" placeholder="Ex: separar granola sem leite condensado"></textarea></label>
       <p class="error" id="product-error" role="alert" hidden></p>
