@@ -16,6 +16,8 @@
   let customOrderDate = '';
   let dashboardPeriod = 'today';
   let customDashboardDate = '';
+  let customerQuery = '';
+  let customerConsentFilter = 'all';
   const weekDays = [
     ['sun', 'Domingo'], ['mon', 'Segunda'], ['tue', 'Terça'], ['wed', 'Quarta'],
     ['thu', 'Quinta'], ['fri', 'Sexta'], ['sat', 'Sábado']
@@ -116,10 +118,34 @@
     if (!settings.whatsappEyebrow) set('whatsappEyebrow', 'PREFERE PEDIR DIRETO?');
     if (!settings.whatsappTitle) set('whatsappTitle', 'Fale com a gente no WhatsApp');
     if (!settings.whatsappButtonText) set('whatsappButtonText', 'CHAMAR AGORA →');
+    if (!settings.paymentSummary) set('paymentSummary', 'PIX cartão ou dinheiro');
     if (typeof settings.cnpj !== 'string') set('cnpj', '');
     if (typeof settings.instagramUrl !== 'string') set('instagramUrl', '');
     if (typeof settings.facebookUrl !== 'string') set('facebookUrl', '');
     if (typeof settings.tiktokUrl !== 'string') set('tiktokUrl', '');
+    if (!settings.infoStripIcons || typeof settings.infoStripIcons !== 'object') {
+      settings.infoStripIcons = { service: '', time: '', delivery: '', payment: '' };
+      changed = true;
+    } else {
+      ['service', 'time', 'delivery', 'payment'].forEach(key => {
+        if (typeof settings.infoStripIcons[key] !== 'string') {
+          settings.infoStripIcons[key] = '';
+          changed = true;
+        }
+      });
+    }
+    if (!settings.dailyOffer || typeof settings.dailyOffer !== 'object') {
+      settings.dailyOffer = { enabled: false, title: '', description: '', buttonText: 'APROVEITAR →', link: '#cardapio', imageUrl: '' };
+      changed = true;
+    } else {
+      const offerDefaults = { enabled: false, title: '', description: '', buttonText: 'APROVEITAR →', link: '#cardapio', imageUrl: '' };
+      Object.entries(offerDefaults).forEach(([key, value]) => {
+        if (typeof settings.dailyOffer[key] !== typeof value) {
+          settings.dailyOffer[key] = value;
+          changed = true;
+        }
+      });
+    }
     if (typeof settings.whatsappCloudEnabled !== 'boolean') set('whatsappCloudEnabled', false);
     if (typeof settings.gatewayEnabled !== 'boolean') set('gatewayEnabled', false);
     if (!settings.gatewayProvider) set('gatewayProvider', 'none');
@@ -186,13 +212,19 @@
       '#gateway-provider': 'gatewayProvider', '#hero-eyebrow': 'heroEyebrow', '#hero-title': 'heroTitle',
       '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
       '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
-      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText',
+      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText', '#payment-summary': 'paymentSummary',
       '#order-redirect-url': 'orderRedirectUrl'
     };
     Object.entries(fields).forEach(([selector, key]) => { $(selector).value = settings[key] ?? ''; });
     $('#whatsapp-cloud-enabled').checked = Boolean(settings.whatsappCloudEnabled);
     $('#gateway-enabled').checked = Boolean(settings.gatewayEnabled);
     $('#order-redirect-enabled').checked = Boolean(settings.orderRedirectEnabled);
+    $('#daily-offer-enabled').checked = Boolean(settings.dailyOffer.enabled);
+    $('#daily-offer-title').value = settings.dailyOffer.title || '';
+    $('#daily-offer-description').value = settings.dailyOffer.description || '';
+    $('#daily-offer-button').value = settings.dailyOffer.buttonText || 'APROVEITAR →';
+    $('#daily-offer-link').value = settings.dailyOffer.link || '#cardapio';
+    $('#daily-offer-image').value = settings.dailyOffer.imageUrl || '';
     $('#store-status-mode').value = settings.statusMode || 'open';
     $('#make-webhook-enabled').checked = Boolean(privateSettings.makeWebhookEnabled);
     $('#make-webhook-url').value = privateSettings.makeWebhookUrl || '';
@@ -205,6 +237,7 @@
     $('#dashboard-date').value = customDashboardDate;
     renderCrmNotifications();
     renderHoursEditor();
+    renderInfoIcons();
     renderPreviews();
   }
 
@@ -222,7 +255,7 @@
       '#gateway-provider': 'gatewayProvider', '#hero-eyebrow': 'heroEyebrow', '#hero-title': 'heroTitle',
       '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
       '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
-      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText',
+      '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText', '#payment-summary': 'paymentSummary',
       '#order-redirect-url': 'orderRedirectUrl'
     };
     Object.entries(fields).forEach(([selector, key]) => { settings[key] = $(selector).value.trim(); });
@@ -236,6 +269,14 @@
     settings.whatsappCloudEnabled = $('#whatsapp-cloud-enabled').checked;
     settings.gatewayEnabled = $('#gateway-enabled').checked;
     settings.orderRedirectEnabled = $('#order-redirect-enabled').checked;
+    settings.dailyOffer = {
+      enabled: $('#daily-offer-enabled').checked,
+      title: $('#daily-offer-title').value.trim(),
+      description: $('#daily-offer-description').value.trim(),
+      buttonText: $('#daily-offer-button').value.trim() || 'APROVEITAR →',
+      link: $('#daily-offer-link').value.trim() || '#cardapio',
+      imageUrl: $('#daily-offer-image').value.trim()
+    };
     collectCrmNotifications();
     privateSettings.makeWebhookEnabled = $('#make-webhook-enabled').checked;
     privateSettings.makeWebhookUrl = $('#make-webhook-url').value.trim();
@@ -397,6 +438,7 @@
   function renderAll() {
     renderDashboard();
     renderOrders();
+    renderCustomers();
     renderProducts();
     renderCategories();
     renderPreviews();
@@ -432,6 +474,114 @@
     const settings = catalog.settings;
     const modeLabels = { auto: 'Automático por horário', open: 'Aberta manualmente', closed: 'Fechada manualmente' };
     $('#operation-summary').innerHTML = `<p><span>Funcionamento</span><b>${esc(modeLabels[settings.statusMode] || modeLabels.open)}</b></p><p><span>Produtos ativos</span><b>${catalog.products.filter(product => product.active).length}</b></p><p><span>Cancelados no período</span><b>${periodOrders.filter(order => order.status === 'cancelado').length}</b></p><p><span>Pedido mínimo</span><b>${money(settings.minOrder)}</b></p><p><span>Taxa de entrega</span><b>${money(settings.deliveryFee)}</b></p><p><span>Tempo estimado</span><b>${esc(settings.estimatedTime)}</b></p>`;
+  }
+
+  function normalizedPhone(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    return digits.startsWith('55') && digits.length > 11 ? digits.slice(2, 13) : digits.slice(-11);
+  }
+
+  function customerAddress(address = {}) {
+    return [
+      [address.street, address.number].filter(Boolean).join(', '),
+      address.complement,
+      address.neighborhood,
+      address.city,
+      address.zip ? `CEP ${address.zip}` : '',
+      address.reference ? `Ref. ${address.reference}` : ''
+    ].filter(Boolean).join(' · ');
+  }
+
+  function customerBase() {
+    const base = new Map();
+    orders.forEach(order => {
+      const customer = order.customer || {};
+      const phone = normalizedPhone(customer.phone);
+      const email = String(customer.email || '').trim().toLowerCase();
+      const key = phone || email || `pedido-${order.id}`;
+      const date = new Date(order.created_at || order.createdAt || 0);
+      const current = base.get(key);
+      if (!current) {
+        base.set(key, {
+          key,
+          name: String(customer.name || '').trim(),
+          phone: String(customer.phone || '').trim(),
+          phoneDigits: phone,
+          email,
+          address: customerAddress(order.address),
+          marketingConsent: customer.marketingConsent === true,
+          marketingConsentAt: customer.marketingConsentAt || '',
+          firstOrder: date,
+          lastOrder: date,
+          orderCount: 1,
+          totalSpent: order.status === 'cancelado' ? 0 : Number(order.total || 0)
+        });
+        return;
+      }
+      current.orderCount += 1;
+      current.totalSpent += order.status === 'cancelado' ? 0 : Number(order.total || 0);
+      if (date < current.firstOrder) current.firstOrder = date;
+      if (date > current.lastOrder) current.lastOrder = date;
+    });
+    return [...base.values()].sort((a, b) => b.lastOrder - a.lastOrder);
+  }
+
+  function filteredCustomers() {
+    const query = customerQuery.toLocaleLowerCase('pt-BR');
+    return customerBase().filter(customer => {
+      if (customerConsentFilter === 'yes' && !customer.marketingConsent) return false;
+      if (customerConsentFilter === 'no' && customer.marketingConsent) return false;
+      if (!query) return true;
+      return `${customer.name} ${customer.phone} ${customer.email} ${customer.address}`.toLocaleLowerCase('pt-BR').includes(query);
+    });
+  }
+
+  function formatCustomerDate(value) {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return '-';
+    return value.toLocaleDateString('pt-BR');
+  }
+
+  function renderCustomers() {
+    const all = customerBase();
+    const visible = filteredCustomers();
+    $('#customers-badge').textContent = all.length;
+    $('#stat-customers').textContent = all.length;
+    $('#stat-customer-emails').textContent = all.filter(customer => customer.email).length;
+    $('#stat-marketing-consent').textContent = all.filter(customer => customer.marketingConsent).length;
+    $('#stat-returning-customers').textContent = all.filter(customer => customer.orderCount > 1).length;
+    $('#customers-list').innerHTML = visible.length ? '<div class="customer-table-head"><span>Cliente</span><span>Contato</span><span>Endereço</span><span>Relacionamento</span><span>Último pedido</span></div>' + visible.map(customer => {
+      const whatsapp = customer.phoneDigits ? `55${customer.phoneDigits}` : '';
+      return `<article class="customer-row"><div data-label="Cliente"><b>${esc(customer.name || 'Sem nome')}</b><small>${customer.orderCount} pedido${customer.orderCount === 1 ? '' : 's'} · ${money(customer.totalSpent)}</small></div><div data-label="Contato">${whatsapp ? `<a href="https://wa.me/${esc(whatsapp)}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '<span>-</span>'}${customer.email ? `<a href="mailto:${esc(customer.email)}">${esc(customer.email)}</a>` : '<small>Sem e-mail</small>'}</div><div data-label="Endereço"><span>${esc(customer.address || 'Não informado')}</span></div><div data-label="Relacionamento"><em class="consent-badge ${customer.marketingConsent ? 'allowed' : ''}">${customer.marketingConsent ? '✓ Aceitou ofertas' : 'Sem autorização'}</em></div><div data-label="Último pedido"><b>${esc(formatCustomerDate(customer.lastOrder))}</b><small>Cliente desde ${esc(formatCustomerDate(customer.firstOrder))}</small></div></article>`;
+    }).join('') : '<div class="empty-admin">Nenhum cliente encontrado com estes filtros.</div>';
+  }
+
+  function csvCell(value) {
+    return `"${String(value ?? '').replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"`;
+  }
+
+  function exportCustomers() {
+    const customers = filteredCustomers();
+    if (!customers.length) {
+      notice('Não há clientes para exportar com estes filtros.', true);
+      return;
+    }
+    const header = ['Nome', 'Telefone', 'Email', 'Endereco', 'Aceitou ofertas', 'Data do consentimento', 'Pedidos', 'Total comprado', 'Primeiro pedido', 'Ultimo pedido'];
+    const rows = customers.map(customer => [
+      customer.name, customer.phone, customer.email, customer.address,
+      customer.marketingConsent ? 'SIM' : 'NAO', customer.marketingConsentAt,
+      customer.orderCount, customer.totalSpent.toFixed(2).replace('.', ','),
+      formatCustomerDate(customer.firstOrder), formatCustomerDate(customer.lastOrder)
+    ]);
+    const csv = '\ufeff' + [header, ...rows].map(row => row.map(csvCell).join(';')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `clientes-acai-do-bom-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    notice(`${customers.length} cliente${customers.length === 1 ? '' : 's'} exportado${customers.length === 1 ? '' : 's'} para a planilha.`);
   }
 
   function statusLabel(status) {
@@ -636,6 +786,7 @@
       });
       renderDashboard();
       renderOrders();
+      renderCustomers();
       const failedEmail = (result.notifications || []).some(notification => !notification.ok);
       notice(failedEmail ? 'Pedido atualizado. O e-mail ficou pendente para revisão.' : 'Pedido atualizado e movido automaticamente no CRM.', failedEmail);
     } catch (error) {
@@ -695,6 +846,7 @@
       deletingOrderIds.forEach(id => knownOrderIds.delete(String(id)));
       renderDashboard();
       renderOrders();
+      renderCustomers();
       notice(deleted.size === 1 ? 'Pedido excluído com segurança.' : `${deleted.size} pedidos cancelados foram apagados.`);
     } catch (error) {
       notice(error.message, true);
@@ -756,10 +908,37 @@
     });
   }
 
+  function renderInfoIcons() {
+    const icons = catalog.settings.infoStripIcons || (catalog.settings.infoStripIcons = {});
+    const definitions = [
+      ['service', 'Atendimento', '📍'],
+      ['time', 'Tempo estimado', '◷'],
+      ['delivery', 'Taxa de entrega', '🛵'],
+      ['payment', 'Pagamento', '💳']
+    ];
+    const editor = $('#info-icons-editor');
+    editor.innerHTML = definitions.map(([key, label, fallback]) => `<div class="info-icon-row" data-info-icon-row="${key}"><div class="info-icon-preview">${icons[key] ? `<img src="${esc(preview(icons[key]))}" alt="">` : fallback}</div><div><b>${esc(label)}</b><input value="${esc(icons[key] || '')}" placeholder="URL da imagem" data-info-icon-url="${key}"></div><label class="option-upload">Enviar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-info-icon-upload="${key}"></label><button type="button" data-info-icon-remove="${key}" ${icons[key] ? '' : 'hidden'}>Remover</button></div>`).join('');
+    editor.querySelectorAll('[data-info-icon-url]').forEach(input => {
+      input.oninput = () => { icons[input.dataset.infoIconUrl] = input.value.trim(); };
+      input.onchange = renderInfoIcons;
+    });
+    editor.querySelectorAll('[data-info-icon-upload]').forEach(input => {
+      input.onchange = () => upload(input, 'infoIcon', input.dataset.infoIconUpload);
+    });
+    editor.querySelectorAll('[data-info-icon-remove]').forEach(button => {
+      button.onclick = () => {
+        icons[button.dataset.infoIconRemove] = '';
+        renderInfoIcons();
+      };
+    });
+  }
+
   function renderPreviews() {
     const settings = catalog.settings;
     $('#logo-preview').innerHTML = settings.logoUrl ? `<img src="${esc(preview(settings.logoUrl))}">` : 'A';
     $('#banner-preview').innerHTML = settings.bannerUrl ? `<img src="${esc(preview(settings.bannerUrl))}">` : '◈';
+    const offerImage = settings.dailyOffer?.imageUrl || $('#daily-offer-image')?.value || '';
+    $('#daily-offer-preview').innerHTML = offerImage ? `<img src="${esc(preview(offerImage))}" alt="">` : 'OFERTA';
     $$('.admin-logo img').forEach(image => { image.src = preview(settings.logoUrl || 'assets/images/logo/logo-acai-do-bom.webp'); });
   }
 
@@ -828,10 +1007,18 @@
     holder?.classList.add('busy');
     try {
       notice('Otimizando e enviando imagem...');
-      const folders = { logo: 'logo', banner: 'banner', product: 'produtos', category: 'categorias', option: 'acompanhamentos', notification: 'mensagens' };
+      const folders = { logo: 'logo', banner: 'banner', product: 'produtos', category: 'categorias', option: 'acompanhamentos', notification: 'mensagens', infoIcon: 'icones', offer: 'ofertas' };
       const url = await SupabaseStore.uploadImage(file, folders[target] || 'geral');
       if (target === 'logo') { catalog.settings.logoUrl = url; $('#logo-url').value = url; }
       if (target === 'banner') { catalog.settings.bannerUrl = url; $('#banner-url').value = url; }
+      if (target === 'offer') {
+        catalog.settings.dailyOffer.imageUrl = url;
+        $('#daily-offer-image').value = url;
+      }
+      if (target === 'infoIcon') {
+        catalog.settings.infoStripIcons[referenceId] = url;
+        renderInfoIcons();
+      }
       if (target === 'product' && editing) { editing.imageUrl = url; $('#edit-image').value = url; renderProductPhoto(); }
       if (target === 'category') {
         const category = catalog.categories.find(item => item.id === referenceId);
@@ -848,7 +1035,7 @@
         renderCrmNotifications();
       }
       renderPreviews();
-      if (target === 'logo' || target === 'banner' || target === 'category') {
+      if (target === 'logo' || target === 'banner' || target === 'category' || target === 'infoIcon' || target === 'offer') {
         await SupabaseStore.saveCatalog(catalog);
         if (target === 'category') renderCategories();
         notice('Imagem armazenada e publicada no cardápio.');
@@ -920,6 +1107,7 @@
       knownOrderIds = new Set(orders.map(order => String(order.id)));
       renderDashboard();
       renderOrders();
+      renderCustomers();
       if (newOrders.length) {
         notice(newOrders.length === 1 ? 'Novo pedido recebido!' : `${newOrders.length} novos pedidos recebidos!`);
         document.title = `(${newOrders.length}) Novo pedido | Açaí do Bom`;
@@ -954,10 +1142,14 @@
         $$('[data-tab]').forEach(item => item.classList.toggle('active', item === button));
         $$('[data-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === button.dataset.tab));
         if (button.dataset.tab === 'orders') { document.title = 'Pedidos | Açaí do Bom'; refreshOrders(false); }
+        if (button.dataset.tab === 'customers') { document.title = 'Clientes | Açaí do Bom'; refreshOrders(false); }
       };
     });
     $('#save-all').onclick = saveAll;
     $('#refresh-orders').onclick = () => refreshOrders(true);
+    $('#customer-search').oninput = event => { customerQuery = event.target.value.trim(); renderCustomers(); };
+    $('#customer-consent-filter').onchange = event => { customerConsentFilter = event.target.value; renderCustomers(); };
+    $('#export-customers').onclick = exportCustomers;
     $('#dashboard-period').onchange = event => {
       dashboardPeriod = event.target.value;
       $('#dashboard-date-field').hidden = dashboardPeriod !== 'custom';
@@ -1058,6 +1250,7 @@
     $$('[data-upload]').forEach(input => { input.onchange = () => upload(input, input.dataset.upload); });
     $('#logo-url').oninput = event => { catalog.settings.logoUrl = event.target.value; renderPreviews(); };
     $('#banner-url').oninput = event => { catalog.settings.bannerUrl = event.target.value; renderPreviews(); };
+    $('#daily-offer-image').oninput = event => { catalog.settings.dailyOffer.imageUrl = event.target.value.trim(); renderPreviews(); };
     $('#edit-image').oninput = event => { if (editing) { editing.imageUrl = event.target.value; renderProductPhoto(); } };
     $('#remove-product-image').onclick = () => {
       if (!editing) return;

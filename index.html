@@ -46,15 +46,21 @@
         <p id="hero-eyebrow">✦ DO SEU JEITO</p>
         <h1><span id="hero-title">O açaí que</span><br><em id="hero-highlight">dá vontade.</em></h1>
         <span id="store-tagline">Seu açaí do seu jeito, rápido e caprichado</span>
-        <div><a class="cta" href="#cardapio">VER CARDÁPIO →</a><span class="open-status" id="store-status">Aberto agora</span></div>
+        <div><a class="cta" href="#cardapio">VER CARDÁPIO →</a><button class="open-status" id="store-status" type="button" data-open-hours aria-haspopup="dialog">Aberto agora</button></div>
       </div>
     </section>
 
-    <section class="info-strip" id="entrega">
-      <article><i>📍</i><span><small>ATENDIMENTO</small><b id="store-city">Ji-Paraná - RO</b></span></article>
-      <article><i>◷</i><span><small>TEMPO ESTIMADO</small><b id="store-time">35–50 min</b></span></article>
-      <article><i>🛵</i><span><small>TAXA A PARTIR DE</small><b id="store-fee">R$ 7,00</b></span></article>
-      <article><i>💳</i><span><small>PAGAMENTO</small><b>PIX cartão ou dinheiro</b></span></article>
+    <section class="info-strip" id="entrega" aria-label="Informações da entrega">
+      <article data-info-card="service"><i data-info-icon="service" data-fallback="📍">📍</i><span><small>ATENDIMENTO</small><b id="store-city">Ji-Paraná - RO</b></span></article>
+      <article class="info-hours"><i data-info-icon="time" data-fallback="◷">◷</i><span><small>TEMPO ESTIMADO</small><b id="store-time">35–50 min</b><button type="button" class="hours-link" data-open-hours>Ver horários</button></span></article>
+      <article data-info-card="delivery"><i data-info-icon="delivery" data-fallback="🛵">🛵</i><span><small>TAXA A PARTIR DE</small><b id="store-fee">R$ 7,00</b></span></article>
+      <article data-info-card="payment"><i data-info-icon="payment" data-fallback="💳">💳</i><span><small>PAGAMENTO</small><b id="store-payment">PIX cartão ou dinheiro</b></span></article>
+    </section>
+
+    <section class="daily-offer" id="daily-offer" hidden aria-label="Oferta do dia">
+      <div class="daily-offer-image" id="daily-offer-image" hidden></div>
+      <div class="daily-offer-copy"><small>OFERTA DO DIA</small><h2 id="daily-offer-title"></h2><p id="daily-offer-description"></p></div>
+      <a id="daily-offer-link" href="#cardapio">APROVEITAR →</a>
     </section>
 
     <section class="menu-section" id="cardapio">
@@ -69,11 +75,27 @@
   <footer class="footer">
     <div class="footer-main">
       <div class="brand has-image"><span class="brand-mark has-logo"><img src="assets/images/logo/logo-acai-do-bom.webp" alt="Açaí do Bom"></span><span><b data-store-name>Açaí do Bom</b><small>FEITO COM CAPRICHO</small></span></div>
-      <div class="footer-business"><b id="footer-establishment">Açaí do Bom</b><span id="footer-location">Ji-Paraná - RO</span><span id="footer-cnpj" hidden></span><a id="footer-phone" href="tel:+556993817951">(69) 9381-7951</a><a id="footer-email" href="mailto:contato@acaidobom.com.br">contato@acaidobom.com.br</a></div>
+      <div class="footer-business">
+        <div class="footer-business-name"><small>ESTABELECIMENTO</small><b id="footer-establishment">Açaí do Bom</b></div>
+        <div class="footer-business-grid">
+          <div><small>ENDEREÇO</small><span id="footer-address">Ji-Paraná Rondônia</span><span id="footer-location">Ji-Paraná - RO</span></div>
+          <div id="footer-cnpj-row" hidden><small>CNPJ</small><span id="footer-cnpj"></span></div>
+          <div><small>CONTATO</small><a id="footer-phone" href="tel:+556993817951">(69) 9381-7951</a><a id="footer-email" href="mailto:contato@acaidobom.com.br">contato@acaidobom.com.br</a></div>
+        </div>
+      </div>
       <div class="footer-social" id="footer-social" aria-label="Redes sociais"></div>
     </div>
     <div class="footer-bottom"><nav><a href="politicas.html#privacidade">Privacidade</a><a href="politicas.html#termos">Termos de uso</a><a href="politicas.html#reembolso">Reembolso e cancelamento</a><a href="politicas.html#cookies">Cookies</a></nav><span>© 2026 Açaí do Bom</span></div>
   </footer>
+
+  <div class="overlay hours-overlay" id="hours-overlay" hidden>
+    <section class="modal hours-modal" role="dialog" aria-modal="true" aria-labelledby="hours-title">
+      <button class="modal-close" type="button" data-close-hours aria-label="Fechar">×</button>
+      <header><small>PLANEJE SEU PEDIDO</small><h2 id="hours-title">Horários de funcionamento</h2><p id="hours-store-status"></p></header>
+      <div class="hours-list" id="hours-list"></div>
+      <footer><button class="primary" type="button" data-close-hours>Entendi</button></footer>
+    </section>
+  </div>
 
   <div class="overlay" id="product-overlay" hidden>
     <section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-name">
@@ -105,7 +127,8 @@
             <div class="returning-customer full" id="returning-customer" hidden>✓ Encontramos seus dados salvos neste aparelho. Confirme e continue.</div>
             <label class="field"><span>Seu nome *</span><input name="name" autocomplete="name" required></label>
             <label class="field"><span>E-mail para confirmação *</span><input name="email" type="email" autocomplete="email" required placeholder="voce@exemplo.com"></label>
-            <label class="remember-profile full"><input type="checkbox" name="rememberProfile" value="1"><span><b>Lembrar meus dados neste aparelho</b><small>Na próxima compra, digite apenas seu telefone para preencher o endereço.</small></span></label><p class="privacy-consent full">Ao continuar, você concorda com os <a href="politicas.html#termos" target="_blank">Termos de uso</a> e a <a href="politicas.html#privacidade" target="_blank">Política de privacidade</a>.</p>
+            <label class="remember-profile full"><input type="checkbox" name="rememberProfile" value="1" checked><span><b>Lembrar meus dados neste aparelho</b><small>Na próxima compra, digite apenas seu telefone para preencher nome, e-mail e endereço.</small></span></label>
+            <label class="marketing-consent full"><input type="checkbox" name="marketingConsent" value="1"><span><b>Quero receber ofertas do Açaí do Bom</b><small>Opcional. Você poderá pedir para sair da lista quando quiser.</small></span></label><p class="privacy-consent full">Ao continuar, você concorda com os <a href="politicas.html#termos" target="_blank">Termos de uso</a> e a <a href="politicas.html#privacidade" target="_blank">Política de privacidade</a>.</p>
           </div>
         </div>
         <div class="checkout-step" data-step="2" hidden>

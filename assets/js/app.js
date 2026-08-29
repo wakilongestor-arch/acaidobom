@@ -52,10 +52,27 @@
     settings.whatsappEyebrow = settings.whatsappEyebrow || 'PREFERE PEDIR DIRETO?';
     settings.whatsappTitle = settings.whatsappTitle || 'Fale com a gente no WhatsApp';
     settings.whatsappButtonText = settings.whatsappButtonText || 'CHAMAR AGORA →';
+    settings.paymentSummary = settings.paymentSummary || 'PIX cartão ou dinheiro';
     settings.cnpj = settings.cnpj || '';
     settings.instagramUrl = settings.instagramUrl || '';
     settings.facebookUrl = settings.facebookUrl || '';
     settings.tiktokUrl = settings.tiktokUrl || '';
+    if (!settings.infoStripIcons || typeof settings.infoStripIcons !== 'object') settings.infoStripIcons = {};
+    settings.infoStripIcons = {
+      service: settings.infoStripIcons.service || '',
+      time: settings.infoStripIcons.time || '',
+      delivery: settings.infoStripIcons.delivery || '',
+      payment: settings.infoStripIcons.payment || ''
+    };
+    if (!settings.dailyOffer || typeof settings.dailyOffer !== 'object') settings.dailyOffer = {};
+    settings.dailyOffer = {
+      enabled: settings.dailyOffer.enabled === true,
+      title: settings.dailyOffer.title || '',
+      description: settings.dailyOffer.description || '',
+      buttonText: settings.dailyOffer.buttonText || 'APROVEITAR →',
+      link: settings.dailyOffer.link || '#cardapio',
+      imageUrl: settings.dailyOffer.imageUrl || ''
+    };
     if (!['auto', 'open', 'closed'].includes(settings.statusMode)) {
       settings.statusMode = settings.open === false ? 'closed' : 'open';
     }
@@ -86,12 +103,15 @@
     $('#store-city').textContent = settings.city;
     $('#store-time').textContent = settings.estimatedTime;
     $('#store-fee').textContent = MenuAPI.money(settings.deliveryFee);
+    $('#store-payment').textContent = settings.paymentSummary;
     const addressNode = $('#store-address');
     if (addressNode) addressNode.textContent = settings.address;
     $('#hero-image').src = settings.bannerUrl;
     const whatsapp = 'https://wa.me/' + String(settings.whatsapp).replace(/\D/g, '');
     $('#nav-whatsapp').href = whatsapp;
     $('#callout-whatsapp').href = whatsapp;
+    renderInfoStrip(settings);
+    renderDailyOffer(settings);
     renderFooter(settings);
     MenuAPI.injectTracking(settings);
     renderCategories();
@@ -113,10 +133,11 @@
 
   function renderFooter(settings) {
     $('#footer-establishment').textContent = settings.establishmentName;
+    $('#footer-address').textContent = settings.address || settings.locationName;
     $('#footer-location').textContent = settings.locationName;
     const cnpj = $('#footer-cnpj');
-    cnpj.textContent = settings.cnpj ? 'CNPJ: ' + settings.cnpj : '';
-    cnpj.hidden = !settings.cnpj;
+    cnpj.textContent = settings.cnpj || '';
+    $('#footer-cnpj-row').hidden = !settings.cnpj;
     const phone = $('#footer-phone');
     phone.textContent = settings.contactPhone;
     const phoneDigits = String(settings.contactPhone).replace(/\D/g, '');
@@ -133,6 +154,60 @@
       const url = safeLink(settings[key]);
       return url ? '<a href="' + escape(url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + name + '" title="' + name + '">' + icon + '</a>' : '';
     }).join('');
+  }
+
+  function safeImageUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (/^(assets\/|data:image\/(?:png|jpeg|webp|gif);base64,)/i.test(raw)) return raw;
+    return safeLink(raw);
+  }
+
+  function renderInfoStrip(settings) {
+    $$('[data-info-icon]').forEach(holder => {
+      const key = holder.dataset.infoIcon;
+      const fallback = holder.dataset.fallback || '●';
+      const url = safeImageUrl(settings.infoStripIcons?.[key]);
+      if (!url) {
+        holder.textContent = fallback;
+        holder.classList.remove('has-image');
+        return;
+      }
+      const image = document.createElement('img');
+      image.src = url;
+      image.alt = '';
+      image.addEventListener('error', () => {
+        holder.textContent = fallback;
+        holder.classList.remove('has-image');
+      }, { once: true });
+      holder.replaceChildren(image);
+      holder.classList.add('has-image');
+    });
+  }
+
+  function renderDailyOffer(settings) {
+    const offer = settings.dailyOffer || {};
+    const container = $('#daily-offer');
+    container.hidden = !offer.enabled || !String(offer.title || '').trim();
+    if (container.hidden) return;
+    $('#daily-offer-title').textContent = offer.title;
+    $('#daily-offer-description').textContent = offer.description || '';
+    $('#daily-offer-description').hidden = !offer.description;
+    const link = $('#daily-offer-link');
+    link.textContent = offer.buttonText || 'APROVEITAR →';
+    link.href = String(offer.link || '').startsWith('#') ? offer.link : (safeLink(offer.link) || '#cardapio');
+    const imageBox = $('#daily-offer-image');
+    const imageUrl = safeImageUrl(offer.imageUrl);
+    imageBox.hidden = !imageUrl;
+    if (imageUrl) {
+      const image = document.createElement('img');
+      image.src = imageUrl;
+      image.alt = offer.title || 'Oferta do dia';
+      image.addEventListener('error', () => { imageBox.hidden = true; }, { once: true });
+      imageBox.replaceChildren(image);
+    } else {
+      imageBox.replaceChildren();
+    }
   }
 
   function renderLogo(url, name) {
@@ -552,6 +627,33 @@
     return { open: false, text: 'Fechado agora' + nextText, mode };
   }
 
+  function renderHoursModal() {
+    const settings = catalog.settings;
+    const today = zonedNow(settings).day;
+    const state = calculateStoreState(settings);
+    const hours = settings.hours || {};
+    $('#hours-store-status').textContent = state.text;
+    $('#hours-store-status').classList.toggle('closed', !state.open);
+    $('#hours-list').innerHTML = dayKeys.map((key, index) => {
+      const schedule = hours[key] || {};
+      const label = weekLabels[index].charAt(0).toUpperCase() + weekLabels[index].slice(1);
+      const value = schedule.enabled ? `${schedule.open || '00:00'} às ${schedule.close || '23:59'}` : 'Fechado';
+      return `<div class="hours-row-public ${index === today ? 'today' : ''} ${schedule.enabled ? '' : 'closed'}"><span>${index === today ? '<small>HOJE</small>' : ''}<b>${escape(label)}</b></span><strong>${escape(value)}</strong></div>`;
+    }).join('');
+  }
+
+  function openHours() {
+    renderHoursModal();
+    $('#hours-overlay').hidden = false;
+    syncBodyLock();
+    requestAnimationFrame(() => $('[data-close-hours]')?.focus());
+  }
+
+  function closeHours() {
+    $('#hours-overlay').hidden = true;
+    syncBodyLock();
+  }
+
   function applyStoreStateToCheckout() {
     if (!catalog) return;
     const state = calculateStoreState();
@@ -570,11 +672,12 @@
     const status = $('#store-status');
     status.textContent = state.text;
     status.classList.toggle('closed', !state.open);
+    if (!$('#hours-overlay').hidden) renderHoursModal();
     applyStoreStateToCheckout();
   }
 
   function syncBodyLock() {
-    const locked = !$('#product-overlay').hidden || $('#cart').classList.contains('open') || !$('#checkout-overlay').hidden;
+    const locked = !$('#product-overlay').hidden || $('#cart').classList.contains('open') || !$('#checkout-overlay').hidden || !$('#hours-overlay').hidden;
     const active = document.body.classList.contains('no-scroll');
     if (locked && !active) {
       lockedScrollY = window.scrollY;
@@ -641,6 +744,11 @@
     $('#cart-items').addEventListener('click', handleCartClick);
     $('[data-close-cart]').addEventListener('click', closeCart);
     $('#cart-backdrop').addEventListener('click', closeCart);
+    $$('[data-open-hours]').forEach(button => button.addEventListener('click', openHours));
+    $$('[data-close-hours]').forEach(button => button.addEventListener('click', closeHours));
+    $('#hours-overlay').addEventListener('click', event => {
+      if (event.target.id === 'hours-overlay') closeHours();
+    });
     $$('[data-close-product]').forEach(button => button.addEventListener('click', () => closeProduct()));
     $('#product-overlay').addEventListener('click', event => {
       if (event.target.id === 'product-overlay') closeProduct();
@@ -669,6 +777,7 @@
       if (!$('#checkout-overlay').hidden) Checkout.close();
       else if (!$('#product-overlay').hidden) closeProduct();
       else if ($('#cart').classList.contains('open')) closeCart();
+      else if (!$('#hours-overlay').hidden) closeHours();
     });
   }
 

@@ -36,7 +36,8 @@
     const profile = readProfiles()[phone];
     if (!profile) { found.hidden = true; return; }
     const values = { ...profile.customer, ...profile.address };
-    Object.entries(values).forEach(([name, value]) => {
+    ['name', 'email', 'zip', 'street', 'number', 'complement', 'neighborhood', 'reference', 'latitude', 'longitude'].forEach(name => {
+      const value = values[name];
       const field = form.elements.namedItem(name);
       if (field && name !== 'phone') field.value = value || '';
     });
@@ -56,13 +57,27 @@
     if (phone.length < 10) return;
     const profiles = readProfiles();
     profiles[phone] = {
-      customer: payload.customer,
+      customer: {
+        name: payload.customer.name,
+        phone: payload.customer.phone,
+        email: payload.customer.email
+      },
       address: payload.address,
       fulfillment: payload.fulfillment,
       updatedAt: new Date().toISOString()
     };
     try { localStorage.setItem(profileStorageKey, JSON.stringify(profiles)); }
     catch (error) { console.warn('Não foi possível lembrar os dados neste aparelho.', error); }
+  }
+
+  function removeProfile(phoneValue) {
+    const phone = normalizePhone(phoneValue);
+    if (phone.length < 10) return;
+    const profiles = readProfiles();
+    if (!profiles[phone]) return;
+    delete profiles[phone];
+    try { localStorage.setItem(profileStorageKey, JSON.stringify(profiles)); }
+    catch (error) { console.warn('Não foi possível remover os dados lembrados neste aparelho.', error); }
   }
 
   function open(nextCatalog) {
@@ -72,6 +87,7 @@
     step = 1;
     lastRestoredPhone = '';
     $('#returning-customer').hidden = true;
+    $('#checkout-form').elements.namedItem('rememberProfile').checked = true;
     resetLocationStatus();
     render();
     $('#checkout-overlay').hidden = false;
@@ -228,7 +244,13 @@
     button.disabled = true;
     button.textContent = 'Registrando pedido...';
     const payload = {
-      customer: { name: data.name, phone: data.phone, email: data.email || '' },
+      customer: {
+        name: data.name,
+        phone: data.phone,
+        email: data.email || '',
+        marketingConsent: data.marketingConsent === '1',
+        marketingConsentAt: data.marketingConsent === '1' ? new Date().toISOString() : ''
+      },
       fulfillment: data.fulfillment,
       address: {
         zip: data.zip || '', street: data.street || '', number: data.number || '',
@@ -253,6 +275,7 @@
     try {
       const result = await MenuAPI.createOrder(payload);
       if (data.rememberProfile === '1') saveProfile(payload);
+      else removeProfile(payload.customer.phone);
       CartStore.clear();
       showSuccess(result, data.name);
       if (whatsappWindow) {

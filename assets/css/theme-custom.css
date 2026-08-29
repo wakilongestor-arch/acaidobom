@@ -230,3 +230,45 @@ button,a,label{touch-action:manipulation}
   .footer-bottom{flex-direction:column}.footer-bottom nav{justify-content:center}
   .location-assist{grid-template-columns:1fr;text-align:center}
 }
+
+/* Faixa de informações viva, oferta do dia e horários públicos. */
+.open-status{border-style:solid;font:800 12px Arial,sans-serif;cursor:pointer}
+.info-strip{padding:17px 18px;border:1px solid rgba(98,8,83,.08);box-shadow:0 18px 55px rgba(38,1,26,.14)}
+.info-strip article{position:relative;min-width:0;padding:7px 20px;border-right-color:rgba(98,8,83,.12);transition:transform .2s ease,background .2s ease}
+.info-strip article:hover{border-radius:14px;background:#fffbed;transform:translateY(-2px)}
+.info-strip i{flex:0 0 44px;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#fff9cf,#fcd307);color:var(--brand);box-shadow:0 7px 18px rgba(98,8,83,.12);font-size:21px;overflow:hidden}
+.info-strip i.has-image{background:#fff;padding:6px;border:1px solid rgba(98,8,83,.1)}
+.info-strip i img{display:block;width:100%;height:100%;object-fit:contain}
+.info-strip small{color:#8b768c}.info-strip b{color:var(--ink);line-height:1.25}
+.hours-link{width:max-content;margin:1px 0 0;padding:0;border:0;background:transparent;color:var(--brand);font-size:9px;font-weight:900;text-decoration:underline;cursor:pointer}
+
+.daily-offer{position:relative;width:min(1180px,calc(100% - 32px));min-height:128px;margin:28px auto 0;padding:20px 22px;border:1px solid rgba(252,211,7,.55);border-radius:22px;background:linear-gradient(120deg,var(--brand-dark),var(--brand));color:#fff;display:grid;grid-template-columns:150px minmax(0,1fr) auto;align-items:center;gap:22px;overflow:hidden;box-shadow:0 17px 42px rgba(38,1,26,.18)}
+.daily-offer::after{content:"";position:absolute;right:16%;top:-80px;width:210px;height:210px;border-radius:50%;background:rgba(252,211,7,.09)}
+.daily-offer-image{position:relative;z-index:1;width:150px;height:88px;border:3px solid rgba(255,255,255,.75);border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 9px 25px rgba(0,0,0,.2)}
+.daily-offer-image img{display:block;width:100%;height:100%;object-fit:cover}
+.daily-offer-copy{position:relative;z-index:1;min-width:0}.daily-offer-copy small{color:var(--accent);font-size:9px;font-weight:950;letter-spacing:.16em}.daily-offer-copy h2{margin:5px 0 4px;font:800 clamp(20px,3vw,30px)/1.1 Georgia;color:#fff}.daily-offer-copy p{margin:0;max-width:680px;color:#eadfeb;font-size:12px;line-height:1.45}
+.daily-offer>a{position:relative;z-index:1;padding:14px 17px;border-radius:11px;background:var(--accent);color:var(--brand-dark);font-size:10px;font-weight:950;white-space:nowrap}
+
+.hours-modal{width:min(500px,100%);overflow:hidden}.hours-modal>header{padding:27px 55px 17px 24px;border-bottom:1px solid var(--line);background:linear-gradient(145deg,#fff,#fffbed)}
+.hours-modal>header small{color:var(--brand);font-size:9px;font-weight:950;letter-spacing:.14em}.hours-modal>header h2{margin:5px 0 7px;color:var(--ink);font:800 25px Georgia}.hours-modal>header p{margin:0;color:#16713b;font-size:11px;font-weight:900}.hours-modal>header p.closed{color:#9b2836}
+.hours-list{max-height:56vh;padding:10px 20px;overflow:auto}.hours-row-public{min-height:50px;padding:9px 7px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:15px}.hours-row-public span{display:flex;align-items:center;gap:8px}.hours-row-public small{padding:4px 6px;border-radius:999px;background:var(--accent);color:var(--brand-dark);font-size:7px;font-weight:950}.hours-row-public b{font-size:12px}.hours-row-public strong{color:var(--brand);font-size:12px}.hours-row-public.closed strong{color:#8f828f}.hours-row-public.today{color:var(--brand)}
+.hours-modal>footer{padding:13px 20px 20px}.hours-modal>footer button{width:100%}
+
+.marketing-consent{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px dashed rgba(98,8,83,.35);border-radius:11px;background:#fffbed;cursor:pointer}.marketing-consent input{width:18px;height:18px;margin-top:2px;accent-color:var(--brand)}.marketing-consent span{display:grid;gap:3px}.marketing-consent b{font-size:12px}.marketing-consent small{color:#6f5c71;font-size:10px;line-height:1.4}
+
+/* Rodapé empresarial organizado sem alterar a composição do computador. */
+.footer-main{grid-template-columns:1fr 1.55fr auto}.footer-business{gap:12px}.footer-business-name{display:grid;gap:4px}.footer-business-name>small,.footer-business-grid small{color:var(--accent);font-size:7px;font-weight:950;letter-spacing:.14em}.footer-business-name>b{color:#fff;font-size:16px}.footer-business-grid{display:grid;grid-template-columns:1.2fr .8fr 1.25fr;gap:12px}.footer-business-grid>div{min-width:0;padding-left:11px;border-left:2px solid rgba(252,211,7,.4);display:flex;flex-direction:column;gap:4px}.footer-business-grid span,.footer-business-grid a{overflow-wrap:anywhere;color:#fff;font-size:10px;line-height:1.35}.footer-business-grid #footer-location{color:#d9c8dd}
+
+@media(max-width:950px){
+  .daily-offer{grid-template-columns:120px minmax(0,1fr) auto}.daily-offer-image{width:120px;height:82px}
+  .footer-main{grid-template-columns:1fr 1.7fr}.footer-social{grid-column:1/-1;justify-self:center}
+}
+@media(max-width:700px){
+  .info-strip{width:calc(100% - 20px);padding:9px;gap:7px;background:#f9f4fa;border-radius:17px}
+  .info-strip article{min-height:92px;padding:10px;border:1px solid rgba(98,8,83,.09);border-radius:13px!important;background:#fff;align-items:flex-start;gap:8px;box-shadow:0 6px 15px rgba(38,1,26,.06)}
+  .info-strip article:hover{transform:none}.info-strip i{flex-basis:35px;width:35px;height:35px;border-radius:10px;font-size:17px}.info-strip span{min-width:0;gap:3px}.info-strip small{font-size:7px}.info-strip b{font-size:10px;overflow-wrap:anywhere}.hours-link{font-size:8px}
+  .daily-offer{min-height:0;margin-top:18px;padding:14px;grid-template-columns:82px minmax(0,1fr);gap:12px;border-radius:17px}.daily-offer-image{width:82px;height:82px;border-width:2px;border-radius:13px}.daily-offer-copy h2{font-size:19px}.daily-offer-copy p{font-size:10px}.daily-offer>a{grid-column:1/-1;width:100%;padding:12px;text-align:center}
+  .hours-modal>header{padding:23px 52px 14px 17px}.hours-modal>header h2{font-size:22px}.hours-list{padding:7px 13px}.hours-row-public{min-height:46px}.hours-modal>footer{padding:10px 13px calc(13px + env(safe-area-inset-bottom))}
+  .footer{padding:29px 16px calc(96px + env(safe-area-inset-bottom))}.footer-main{width:100%;grid-template-columns:1fr;justify-items:stretch;text-align:left;gap:20px}.footer-main>.brand{justify-self:center}.footer .brand-mark.has-logo{width:82px;height:42px}.footer-business{width:100%;padding:15px;border:1px solid rgba(255,255,255,.14);border-radius:15px;background:rgba(255,255,255,.06)}.footer-business-grid{grid-template-columns:1fr 1fr;gap:13px}.footer-business-grid>div{padding-left:9px}.footer-business-grid>div:last-child{grid-column:1/-1}.footer-business-grid span,.footer-business-grid a{font-size:11px}.footer-social{grid-column:auto;justify-self:center}.footer-bottom{text-align:center}.footer-bottom nav{gap:11px}
+}
+@media(max-width:380px){.info-strip article{padding:8px;gap:6px}.info-strip i{flex-basis:31px;width:31px;height:31px}.footer-business-grid{grid-template-columns:1fr}.footer-business-grid>div:last-child{grid-column:auto}}

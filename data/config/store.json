@@ -27,6 +27,21 @@
   "deliveryFee": 7,
   "minOrder": 15,
   "estimatedTime": "35–50 min",
+  "paymentSummary": "PIX cartão ou dinheiro",
+  "infoStripIcons": {
+    "service": "",
+    "time": "",
+    "delivery": "",
+    "payment": ""
+  },
+  "dailyOffer": {
+    "enabled": false,
+    "title": "",
+    "description": "",
+    "buttonText": "APROVEITAR →",
+    "link": "#cardapio",
+    "imageUrl": ""
+  },
   "open": true,
   "statusMode": "open",
   "timezone": "America/Porto_Velho",

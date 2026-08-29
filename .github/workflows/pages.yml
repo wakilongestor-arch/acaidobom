@@ -27,7 +27,7 @@ jobs:
       - name: Preparar versão pública
         run: |
           mkdir -p _site/sistema/admin
-          cp index.html manifest.json robots.txt sitemap.xml _site/
+          cp index.html politicas.html favicon.ico manifest.json robots.txt sitemap.xml _site/
           cp -R assets data _site/
           rm -rf _site/data/orders
           cp sistema/admin/index.html sistema/admin/admin.css sistema/admin/github-admin.js _site/sistema/admin/
