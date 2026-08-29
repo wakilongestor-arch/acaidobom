@@ -711,16 +711,13 @@
   function bind() {
     $('#search').addEventListener('input', event => {
       query = event.target.value;
-      $('#clear-search').hidden = !query;
       renderProducts();
     });
-    $('#focus-search').addEventListener('click', () => $('#search').focus());
-    $('#clear-search').addEventListener('click', () => {
-      query = '';
-      $('#search').value = '';
-      $('#clear-search').hidden = true;
+    $('#focus-search').addEventListener('click', () => {
+      const input = $('#search');
+      input.focus({ preventScroll: true });
+      query = input.value;
       renderProducts();
-      $('#search').focus();
     });
     $('#categories').addEventListener('click', event => {
       const button = event.target.closest('[data-category]');
@@ -728,7 +725,6 @@
       active = button.dataset.category;
       query = '';
       $('#search').value = '';
-      $('#clear-search').hidden = true;
       renderCategories();
       renderProducts();
     });
