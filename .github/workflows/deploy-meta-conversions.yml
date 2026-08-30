@@ -1,0 +1,59 @@
+name: Deploy Meta Conversions API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/meta-conversions/**'
+      - '.github/workflows/deploy-meta-conversions.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-meta-conversions-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      META_CAPI_ACCESS_TOKEN: ${{ secrets.META_CAPI_ACCESS_TOKEN }}
+      META_CAPI_TEST_EVENT_CODE: ${{ secrets.META_CAPI_TEST_EVENT_CODE }}
+      META_CAPI_PIXEL_ID: '2177372426144363'
+      PROJECT_ID: giswmwyidnqehflvaini
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate deployment credentials
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::Configure o segredo SUPABASE_ACCESS_TOKEN antes de executar este workflow."
+            exit 1
+          fi
+
+      - name: Configure Meta secrets when available
+        run: |
+          if [ -n "$META_CAPI_ACCESS_TOKEN" ]; then
+            supabase secrets set \
+              META_CAPI_ACCESS_TOKEN="$META_CAPI_ACCESS_TOKEN" \
+              META_CAPI_PIXEL_ID="$META_CAPI_PIXEL_ID" \
+              --project-ref "$PROJECT_ID"
+          else
+            echo "::warning::A função será publicada, mas só enviará eventos depois que META_CAPI_ACCESS_TOKEN for configurado."
+          fi
+
+          if [ -n "$META_CAPI_TEST_EVENT_CODE" ]; then
+            supabase secrets set META_CAPI_TEST_EVENT_CODE="$META_CAPI_TEST_EVENT_CODE" --project-ref "$PROJECT_ID"
+          else
+            supabase secrets unset META_CAPI_TEST_EVENT_CODE --project-ref "$PROJECT_ID" || true
+          fi
+
+      - name: Deploy meta-conversions function
+        run: supabase functions deploy meta-conversions --project-ref "$PROJECT_ID" --no-verify-jwt

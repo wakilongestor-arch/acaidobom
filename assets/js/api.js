@@ -50,7 +50,7 @@
     if (window.SupabaseStore?.configured) {
       try {
         const saved = await window.SupabaseStore.createOrder(payload, orderNumber);
-        trackOrder(payload, orderNumber);
+        const eventId = trackOrder(payload, orderNumber);
         const settings = window.ACAI_CATALOG?.settings || {};
         let notificationSent = false;
         let notificationError = '';
@@ -58,6 +58,16 @@
         let emailAutomationConfigured = false;
         let emailNotificationError = '';
         let paymentUrl = '';
+        if (saved?.id && payload.customer.marketingConsent === true) {
+          try {
+            const metaConversion = await window.SupabaseStore.notifyMetaPurchase(saved.id, eventId);
+            if (metaConversion.sent !== true && metaConversion.skipped !== true && metaConversion.configured !== false) {
+              console.warn('Pedido salvo; a Meta não confirmou o evento de servidor.', metaConversion);
+            }
+          } catch (error) {
+            console.warn('Pedido salvo; Conversions API indisponível.', error);
+          }
+        }
         if (saved?.id) {
           try {
             const emailNotification = await window.SupabaseStore.notifyOrderEmail(saved.id, 'created');
@@ -112,6 +122,8 @@
 
   function trackOrder(payload, orderNumber) {
     const settings = window.ACAI_CATALOG?.settings || {};
+    const eventId = orderNumber;
+    const marketingConsent = payload.customer?.marketingConsent === true;
     const value = Math.round((Number(payload.total) || 0) * 100) / 100;
     const items = (Array.isArray(payload.items) ? payload.items : []).map((item, index) => ({
       item_id: String(item.productId || index + 1),
@@ -123,17 +135,20 @@
     window.dataLayer.push({
       event: 'purchase',
       transaction_id: orderNumber,
+      event_id: eventId,
+      marketing_consent: marketingConsent,
       value,
       currency: 'BRL',
       items,
-      ecommerce: { transaction_id: orderNumber, value, currency: 'BRL', items }
+      ecommerce: { transaction_id: orderNumber, event_id: eventId, value, currency: 'BRL', items }
     });
-    if (!settings.gtmId && typeof window.fbq === 'function') {
-      window.fbq('track', 'Purchase', { value, currency: 'BRL' });
+    if (marketingConsent && !settings.gtmId && typeof window.fbq === 'function') {
+      window.fbq('track', 'Purchase', { value, currency: 'BRL' }, { eventID: eventId });
     }
     if (!settings.gtmId && typeof window.gtag === 'function') {
-      window.gtag('event', 'purchase', { transaction_id: orderNumber, value, currency: 'BRL', items });
+      window.gtag('event', 'purchase', { transaction_id: orderNumber, event_id: eventId, value, currency: 'BRL', items });
     }
+    return eventId;
   }
 
   function money(value) {

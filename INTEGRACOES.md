@@ -108,7 +108,35 @@ Cada chamada também inclui `order`, `customer`, `address`, `items`, `totals`, a
 
 Cadastre e valide um domínio de envio no Mailgun antes de usar um remetente `@acaidobom.com.br`. Se estiver usando apenas o domínio sandbox do Mailgun, os destinatários também precisam estar autorizados no sandbox. Depois de validar o domínio, use em **E-mail dos pedidos** no painel um endereço pertencente a esse domínio.
 
-## 5. Teste seguro
+## 5. Meta Conversions API sem servidor pago
+
+A compra do navegador continua sendo disparada pelo GTM. A função `meta-conversions` envia o mesmo pedido pelo Supabase para a Conversions API da Meta, sem colocar o token no JavaScript público e sem depender de um contêiner server-side pago.
+
+O envio só é permitido quando o cliente marca o consentimento de marketing. A integração envia `Purchase` com valor, moeda, número do pedido, produtos e dados de correspondência normalizados e criptografados com SHA-256. E-mail, telefone, nome e endereço nunca são enviados em texto aberto. IP, navegador e cookies técnicos `_fbp`/`_fbc` são enviados conforme o protocolo da Meta. Falha da Meta não cancela nem bloqueia o checkout.
+
+### 5.1 Ativar somente pelo GitHub
+
+1. No repositório, abra **Settings → Secrets and variables → Actions**.
+2. Crie o segredo `META_CAPI_ACCESS_TOKEN` e cole o token da Conversions API. Nunca coloque esse token em arquivo, commit ou mensagem.
+3. Opcionalmente, durante o teste, crie `META_CAPI_TEST_EVENT_CODE` com o código exibido em **Testar eventos** da Meta.
+4. Abra **Actions → Deploy Meta Conversions API → Run workflow**.
+5. Depois do teste, exclua `META_CAPI_TEST_EVENT_CODE` e execute o workflow novamente para entrar em produção.
+
+O workflow usa o `SUPABASE_ACCESS_TOKEN` que já está configurado, protege os segredos no Supabase e publica a função sem exigir terminal.
+
+### 5.2 Consentimento e deduplicação
+
+A camada de dados publica `event_id` com o mesmo valor de `transaction_id` e também `marketing_consent`.
+
+No GTM:
+
+1. Crie uma variável da camada de dados chamada `event_id` (Versão 2) e selecione essa variável no campo **Event ID** da tag Meta Pixel `Purchase`.
+2. Crie outra variável da camada de dados chamada `marketing_consent` (Versão 2).
+3. No acionador da tag Meta `Purchase`, mantenha o evento `purchase` e adicione a condição `marketing_consent é igual a true`.
+
+Não use um identificador aleatório diferente no campo Event ID. Navegador e Servidor precisam chegar à Meta com o mesmo nome `Purchase` e o mesmo `event_id` para a deduplicação funcionar.
+
+## 6. Teste seguro
 
 Faça um pedido pequeno e confirme este roteiro:
 

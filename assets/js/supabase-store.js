@@ -127,6 +127,28 @@
     return data || {};
   }
 
+  function readCookie(name) {
+    const prefix = `${encodeURIComponent(name)}=`;
+    const cookie = document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith(prefix));
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : '';
+  }
+
+  async function notifyMetaPurchase(orderId, eventId) {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { data, error } = await db.functions.invoke('meta-conversions', {
+      body: {
+        orderId,
+        eventId,
+        sourceUrl: window.location.href,
+        fbp: readCookie('_fbp'),
+        fbc: readCookie('_fbc')
+      }
+    });
+    throwIfError(error, 'O pedido foi salvo, mas a compra não foi enviada à Meta.');
+    return data || {};
+  }
+
   async function notifyOrderEmail(orderId, event = 'created') {
     const db = getClient();
     if (!db) throw new Error('Supabase não configurado.');
@@ -282,6 +304,7 @@
     savePrivateSettings,
     createOrder,
     notifyOrder,
+    notifyMetaPurchase,
     notifyOrderEmail,
     testMakeWebhook,
     createCheckout,
