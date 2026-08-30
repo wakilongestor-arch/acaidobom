@@ -53,6 +53,24 @@ function validateMakeUrl(value: unknown) {
   }
 }
 
+function paymentLabel(method: unknown) {
+  return ({
+    pix: 'PIX',
+    card_delivery: 'Cartão na entrega',
+    cash: 'Dinheiro',
+    payment_link: 'Pagamento on-line'
+  } as Record<string, string>)[String(method || '')] || String(method || 'Não informado');
+}
+
+function paymentStatusLabel(status: unknown) {
+  return ({ pendente: 'Pendente', pago: 'Pago', estornado: 'Estornado' } as Record<string, string>)[String(status || '')] || String(status || 'Pendente');
+}
+
+function paymentDetail(order: any) {
+  const method = paymentLabel(order.payment_method);
+  return order.payment_method === 'cash' && order.change_for ? `${method} · troco para ${order.change_for}` : method;
+}
+
 function orderNote(order: any, store: any) {
   const customer = order.customer || {};
   const address = order.address || {};
@@ -73,7 +91,8 @@ function orderNote(order: any, store: any) {
     (item.selections || []).forEach((selection: any) => {
       const options = (selection.options || []).map((option: any) => {
         const price = Number(option.price || 0);
-        return `${option.name}${price ? ` (+${money(price)})` : ''}`;
+        const priceText = price ? (selection.priceMode === 'final' ? ` (${money(price)})` : ` (+${money(price)})`) : '';
+        return `${option.name}${priceText}`;
       }).join(', ');
       lines.push(`   ${selection.groupName || 'Adicionais'}: ${options}`);
     });
@@ -85,8 +104,8 @@ function orderNote(order: any, store: any) {
     `Entrega: ${money(order.delivery_fee)}`,
     `TOTAL: ${money(order.total)}`,
     '',
-    `Pagamento: ${order.payment_method || '-'}`,
-    `Status do pagamento: ${order.payment_status || 'pendente'}`
+    `Pagamento: ${paymentDetail(order)}`,
+    `Status do pagamento: ${paymentStatusLabel(order.payment_status)}`
   );
   if (order.fulfillment === 'delivery') {
     lines.push(
@@ -130,14 +149,14 @@ function storeEmail(order: any, store: any, note: string) {
   const customer = order.customer || {};
   const address = order.address || {};
   const delivery = order.fulfillment === 'delivery'
-    ? `${html(address.street)}, ${html(address.number)}${address.complement ? ` — ${html(address.complement)}` : ''}<br>${html(address.neighborhood)} — ${html(address.city)}${address.zip ? ` — CEP ${html(address.zip)}` : ''}${address.reference ? `<br><b>Referência:</b> ${html(address.reference)}` : ''}${address.mapUrl ? `<br><a href="${html(address.mapUrl)}">Abrir mapa</a>` : ''}`
+    ? `${html(address.street)}, ${html(address.number)}${address.complement ? ` — ${html(address.complement)}` : ''}<br>${html(address.neighborhood)} — ${html(address.city)}${address.zip ? ` — CEP ${html(address.zip)}` : ''}${address.deliveryRegion ? `<br><b>Região de entrega:</b> ${html(address.deliveryRegion)}` : ''}${address.reference ? `<br><b>Referência:</b> ${html(address.reference)}` : ''}${address.mapUrl ? `<br><a href="${html(address.mapUrl)}">Abrir mapa</a>` : ''}`
     : 'Retirada no estabelecimento';
-  const content = `<div style="background:#faf7fa;border:1px solid #eadfea;border-radius:12px;padding:16px;margin:18px 0"><b>Cliente:</b> ${html(customer.name)}<br><b>WhatsApp:</b> ${html(customer.phone)}<br><b>E-mail:</b> ${html(customer.email)}<br><b>Recebimento:</b> ${delivery}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${itemRows(order)}<tr><td style="padding-top:16px"><b>TOTAL</b></td><td style="padding-top:16px;text-align:right;font-size:22px;color:#620853"><b>${html(money(order.total))}</b></td></tr></table>${order.notes ? `<p><b>Observações gerais:</b> ${html(order.notes)}</p>` : ''}`;
+  const content = `<div style="background:#faf7fa;border:1px solid #eadfea;border-radius:12px;padding:16px;margin:18px 0"><b>Cliente:</b> ${html(customer.name)}<br><b>WhatsApp:</b> ${html(customer.phone)}<br><b>E-mail:</b> ${html(customer.email)}<br><b>Recebimento:</b> ${delivery}<br><b>Pagamento escolhido:</b> ${html(paymentDetail(order))}<br><b>Status do pagamento:</b> ${html(paymentStatusLabel(order.payment_status))}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${itemRows(order)}<tr><td style="padding-top:16px"><b>TOTAL</b></td><td style="padding-top:16px;text-align:right;font-size:22px;color:#620853"><b>${html(money(order.total))}</b></td></tr></table>${order.notes ? `<p><b>Observações gerais:</b> ${html(order.notes)}</p>` : ''}`;
   return {
     to: store.orderEmail || store.publicEmail || '',
     replyTo: customer.email || '',
     subject: `Novo pedido ${order.order_number} — ${customer.name || 'cliente'} — ${money(order.total)}`,
-    preheader: `${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'} · ${money(order.total)}`,
+    preheader: `${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'} · ${paymentLabel(order.payment_method)} · ${money(order.total)}`,
     text: note,
     html: emailFrame(`Novo pedido ${order.order_number}`, 'Um novo pedido foi registrado automaticamente no cardápio.', content, store)
   };
