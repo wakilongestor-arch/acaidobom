@@ -121,6 +121,74 @@
     return orderResult(orderNumber, payload, false);
   }
 
+  function roundTrackingValue(value) {
+    return Math.round((Number(value) || 0) * 100) / 100;
+  }
+
+  function trackingAttribution() {
+    const record = window.MenuAttribution?.forOrder?.() || null;
+    return record?.last_touch || {};
+  }
+
+  function trackingItem(item, index) {
+    const productId = String(item.productId || item.id || index + 1);
+    const product = (window.ACAI_CATALOG?.products || []).find(current => String(current.id) === productId) || {};
+    const category = (window.ACAI_CATALOG?.categories || []).find(current => current.id === product.categoryId) || {};
+    return {
+      item_id: productId,
+      item_name: String(item.name || product.name || 'Produto'),
+      item_category: String(category.name || ''),
+      price: roundTrackingValue(item.unitTotal ?? item.price ?? item.basePrice ?? product.price),
+      quantity: Math.max(1, Number(item.quantity) || 1)
+    };
+  }
+
+  function trackEcommerce(eventName, sourceItems, extra = {}) {
+    if (!['view_item', 'add_to_cart', 'begin_checkout'].includes(eventName)) return;
+    const items = (Array.isArray(sourceItems) ? sourceItems : [sourceItems])
+      .filter(Boolean)
+      .map(trackingItem);
+    if (!items.length) return;
+
+    const attribution = trackingAttribution();
+    const value = roundTrackingValue(
+      extra.value ?? items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    );
+    const campaign = {
+      utm_source: attribution.source || '',
+      utm_medium: attribution.medium || '',
+      utm_campaign: attribution.campaign || '',
+      utm_content: attribution.content || '',
+      utm_term: attribution.term || '',
+      traffic_referrer: attribution.referrer || '',
+      landing_page: attribution.landingPage || ''
+    };
+
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: eventName,
+      ...campaign,
+      value,
+      currency: 'BRL',
+      items,
+      ecommerce: { value, currency: 'BRL', items }
+    });
+
+    const consentState = window.MenuConsent?.get() || {};
+    if (window.__ACAI_DIRECT_GA4__ === true && consentState.analytics === true && typeof window.gtag === 'function') {
+      window.gtag('event', eventName, {
+        value,
+        currency: 'BRL',
+        items,
+        order_source: campaign.utm_source,
+        order_medium: campaign.utm_medium,
+        order_campaign: campaign.utm_campaign,
+        order_content: campaign.utm_content,
+        order_term: campaign.utm_term
+      });
+    }
+  }
+
   function trackOrder(payload, orderNumber) {
     const settings = window.ACAI_CATALOG?.settings || {};
     const eventId = orderNumber;
@@ -171,7 +239,12 @@
         utm_medium: attribution.medium || '',
         utm_campaign: attribution.campaign || '',
         utm_content: attribution.content || '',
-        utm_term: attribution.term || ''
+        utm_term: attribution.term || '',
+        order_source: attribution.source || '',
+        order_medium: attribution.medium || '',
+        order_campaign: attribution.campaign || '',
+        order_content: attribution.content || '',
+        order_term: attribution.term || ''
       });
     }
     return eventId;
@@ -311,5 +384,5 @@
     activateTracking();
   }
 
-  window.MenuAPI = { loadCatalog, createOrder, money, buildNote, injectTracking };
+  window.MenuAPI = { loadCatalog, createOrder, money, buildNote, injectTracking, trackEcommerce };
 })();
