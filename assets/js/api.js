@@ -111,10 +111,29 @@
   }
 
   function trackOrder(payload, orderNumber) {
+    const settings = window.ACAI_CATALOG?.settings || {};
+    const value = Math.round((Number(payload.total) || 0) * 100) / 100;
+    const items = (Array.isArray(payload.items) ? payload.items : []).map((item, index) => ({
+      item_id: String(item.productId || index + 1),
+      item_name: String(item.name || 'Produto'),
+      price: Math.round((Number(item.unitTotal ?? item.basePrice) || 0) * 100) / 100,
+      quantity: Math.max(1, Number(item.quantity) || 1)
+    }));
     window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({ event: 'purchase', transaction_id: orderNumber, value: Number(payload.total || 0), currency: 'BRL' });
-    if (typeof window.fbq === 'function') window.fbq('track', 'Purchase', { value: Number(payload.total || 0), currency: 'BRL' });
-    if (typeof window.gtag === 'function') window.gtag('event', 'purchase', { transaction_id: orderNumber, value: Number(payload.total || 0), currency: 'BRL' });
+    window.dataLayer.push({
+      event: 'purchase',
+      transaction_id: orderNumber,
+      value,
+      currency: 'BRL',
+      items,
+      ecommerce: { transaction_id: orderNumber, value, currency: 'BRL', items }
+    });
+    if (!settings.gtmId && typeof window.fbq === 'function') {
+      window.fbq('track', 'Purchase', { value, currency: 'BRL' });
+    }
+    if (!settings.gtmId && typeof window.gtag === 'function') {
+      window.gtag('event', 'purchase', { transaction_id: orderNumber, value, currency: 'BRL', items });
+    }
   }
 
   function money(value) {
