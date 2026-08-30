@@ -376,6 +376,13 @@
     quantity = 1;
     productStep = 0;
     const category = catalog.categories.find(item => item.id === selected.categoryId) || {};
+    MenuAPI.trackEcommerce('view_item', [{
+      productId: selected.id,
+      name: selected.name,
+      basePrice: selected.price,
+      unitTotal: selected.price,
+      quantity: 1
+    }], { value: selected.price });
     $('#product-image').src = selected.imageUrl || category.imageUrl || catalog.settings.bannerUrl;
     $('#product-image').alt = selected.name;
     $('#product-name').textContent = selected.name;
@@ -465,7 +472,7 @@
         return;
       }
     }
-    CartStore.add({
+    const cartItem = {
       productId: selected.id,
       name: selected.name,
       imageUrl: selected.imageUrl,
@@ -476,7 +483,9 @@
         .map(group => ({ groupId: group.id, groupName: group.name, options: selections[group.id] })),
       notes: $('#item-notes').value.trim(),
       unitTotal: unitTotal()
-    });
+    };
+    CartStore.add(cartItem);
+    MenuAPI.trackEcommerce('add_to_cart', [cartItem]);
     closeProduct(false, true);
     openCart();
   }
@@ -766,7 +775,9 @@
         return;
       }
       closeCart();
-      Checkout.open(catalog);
+      if (Checkout.open(catalog)) {
+        MenuAPI.trackEcommerce('begin_checkout', CartStore.get(), { value: CartStore.subtotal() });
+      }
     });
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
