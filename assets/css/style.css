@@ -14,3 +14,5 @@
 @media(max-width:420px){.products{grid-template-columns:1fr}.product-media{height:190px}.product-copy p{min-height:auto}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .email-confirmation{margin-top:10px;padding:12px 14px;border:1px solid #b9dfc4;border-radius:11px;background:#eefaf1;color:#176b32;font-size:12px;line-height:1.5;text-align:left}.email-confirmation.pending{border-color:#ead778;background:#fff9cf;color:#620853}
+
+.delivery-quote{margin:0;padding:10px 12px;border-radius:10px;background:#f4f0f5;color:#620853;font-size:13px;font-weight:750;line-height:1.45}.delivery-quote.blocked{background:#fff0f1;color:#a2182a}.delivery-quote.matched{background:#eef9f0;color:#216332}
