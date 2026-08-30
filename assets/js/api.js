@@ -58,7 +58,8 @@
         let emailAutomationConfigured = false;
         let emailNotificationError = '';
         let paymentUrl = '';
-        if (saved?.id && payload.customer.marketingConsent === true) {
+        const trackingConsent = window.MenuConsent?.get() || { marketing: false };
+        if (saved?.id && payload.customer.marketingConsent === true && trackingConsent.marketing === true) {
           try {
             const metaConversion = await window.SupabaseStore.notifyMetaPurchase(saved.id, eventId);
             if (metaConversion.sent !== true && metaConversion.skipped !== true && metaConversion.configured !== false) {
@@ -123,7 +124,12 @@
   function trackOrder(payload, orderNumber) {
     const settings = window.ACAI_CATALOG?.settings || {};
     const eventId = orderNumber;
-    const marketingConsent = payload.customer?.marketingConsent === true;
+    const consentState = window.MenuConsent?.get() || {};
+    const checkoutMarketingConsent = payload.customer?.marketingConsent === true;
+    const cookieMarketingConsent = consentState.marketing === true;
+    const marketingConsent = checkoutMarketingConsent && cookieMarketingConsent;
+    const attributionRecord = payload.customer?.attribution || window.MenuAttribution?.forOrder?.() || null;
+    const attribution = attributionRecord?.last_touch || {};
     const value = Math.round((Number(payload.total) || 0) * 100) / 100;
     const items = (Array.isArray(payload.items) ? payload.items : []).map((item, index) => ({
       item_id: String(item.productId || index + 1),
@@ -137,6 +143,15 @@
       transaction_id: orderNumber,
       event_id: eventId,
       marketing_consent: marketingConsent,
+      checkout_marketing_consent: checkoutMarketingConsent,
+      cookie_marketing_consent: cookieMarketingConsent,
+      utm_source: attribution.source || '',
+      utm_medium: attribution.medium || '',
+      utm_campaign: attribution.campaign || '',
+      utm_content: attribution.content || '',
+      utm_term: attribution.term || '',
+      traffic_referrer: attribution.referrer || '',
+      landing_page: attribution.landingPage || '',
       value,
       currency: 'BRL',
       items,
@@ -145,8 +160,19 @@
     if (marketingConsent && !settings.gtmId && typeof window.fbq === 'function') {
       window.fbq('track', 'Purchase', { value, currency: 'BRL' }, { eventID: eventId });
     }
-    if (!settings.gtmId && typeof window.gtag === 'function') {
-      window.gtag('event', 'purchase', { transaction_id: orderNumber, event_id: eventId, value, currency: 'BRL', items });
+    if (window.__ACAI_DIRECT_GA4__ === true && consentState.analytics === true && typeof window.gtag === 'function') {
+      window.gtag('event', 'purchase', {
+        transaction_id: orderNumber,
+        event_id: eventId,
+        value,
+        currency: 'BRL',
+        items,
+        utm_source: attribution.source || '',
+        utm_medium: attribution.medium || '',
+        utm_campaign: attribution.campaign || '',
+        utm_content: attribution.content || '',
+        utm_term: attribution.term || ''
+      });
     }
     return eventId;
   }
@@ -210,30 +236,79 @@
     return lines.join('\n');
   }
 
+  let trackingSettings = null;
+  let consentListenerBound = false;
+  const trackingLoaded = { gtm: false, ga4: false, meta: false };
+
+  function currentConsent() {
+    return window.MenuConsent?.get() || {
+      decided: false,
+      analytics: false,
+      marketing: false
+    };
+  }
+
+  function loadGTM(idValue) {
+    if (trackingLoaded.gtm) return;
+    const id = String(idValue || '').replace(/[^A-Z0-9-]/gi, '');
+    if (!id) return;
+    trackingLoaded.gtm = true;
+    const script = document.createElement('script');
+    script.text = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s);j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i;f.parentNode.insertBefore(j,f)})(window,document,'script','dataLayer','" + id + "');";
+    document.head.appendChild(script);
+  }
+
+  function loadGA4(idValue) {
+    if (trackingLoaded.ga4) return;
+    const id = String(idValue || '').replace(/[^A-Z0-9-]/gi, '');
+    if (!id) return;
+    trackingLoaded.ga4 = true;
+    window.__ACAI_DIRECT_GA4__ = true;
+    const loader = document.createElement('script');
+    loader.async = true;
+    loader.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+    document.head.appendChild(loader);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+    window.gtag('js', new Date());
+    window.gtag('config', id, { send_page_view: true });
+  }
+
+  function loadMeta(idValue) {
+    if (trackingLoaded.meta) return;
+    const id = String(idValue || '').replace(/\D/g, '');
+    if (!id) return;
+    trackingLoaded.meta = true;
+    const script = document.createElement('script');
+    script.text = "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','" + id + "');fbq('track','PageView');";
+    document.head.appendChild(script);
+  }
+
+  function activateTracking() {
+    if (!trackingSettings) return;
+    const consent = currentConsent();
+    if (!consent.decided) return;
+
+    if (trackingSettings.gtmId && consent.marketing) {
+      loadGTM(trackingSettings.gtmId);
+      return;
+    }
+
+    if (trackingSettings.ga4Id && consent.analytics) {
+      loadGA4(trackingSettings.ga4Id);
+    }
+    if (!trackingSettings.gtmId && trackingSettings.metaPixelId && consent.marketing) {
+      loadMeta(trackingSettings.metaPixelId);
+    }
+  }
+
   function injectTracking(settings) {
-    if (settings.gtmId) {
-      const id = settings.gtmId.replace(/[^A-Z0-9-]/gi, '');
-      const script = document.createElement('script');
-      script.text = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s);j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i;f.parentNode.insertBefore(j,f)})(window,document,'script','dataLayer','${id}');`;
-      document.head.appendChild(script);
+    trackingSettings = settings || {};
+    if (!consentListenerBound) {
+      consentListenerBound = true;
+      window.addEventListener('acai:consent-changed', activateTracking);
     }
-    if (settings.ga4Id) {
-      const id = settings.ga4Id.replace(/[^A-Z0-9-]/gi, '');
-      const loader = document.createElement('script');
-      loader.async = true;
-      loader.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
-      document.head.appendChild(loader);
-      window.dataLayer = window.dataLayer || [];
-      window.gtag = function () { window.dataLayer.push(arguments); };
-      window.gtag('js', new Date());
-      window.gtag('config', id);
-    }
-    if (settings.metaPixelId) {
-      const id = settings.metaPixelId.replace(/\D/g, '');
-      const script = document.createElement('script');
-      script.text = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${id}');fbq('track','PageView');`;
-      document.head.appendChild(script);
-    }
+    activateTracking();
   }
 
   window.MenuAPI = { loadCatalog, createOrder, money, buildNote, injectTracking };

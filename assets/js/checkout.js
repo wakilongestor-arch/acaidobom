@@ -249,7 +249,14 @@
         phone: data.phone,
         email: data.email || '',
         marketingConsent: data.marketingConsent === '1',
-        marketingConsentAt: data.marketingConsent === '1' ? new Date().toISOString() : ''
+        marketingConsentAt: data.marketingConsent === '1' ? new Date().toISOString() : '',
+        trackingConsent: window.MenuConsent?.get?.() || {
+          necessary: true,
+          analytics: false,
+          marketing: false,
+          decided: false
+        },
+        attribution: window.MenuAttribution?.forOrder?.() || null
       },
       fulfillment: data.fulfillment,
       address: {

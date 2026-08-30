@@ -136,6 +136,33 @@ No GTM:
 
 Não use um identificador aleatório diferente no campo Event ID. Navegador e Servidor precisam chegar à Meta com o mesmo nome `Purchase` e o mesmo `event_id` para a deduplicação funcionar.
 
+### 5.3 Banner, Consent Mode e origem da venda
+
+O cardápio usa o cookie próprio `acai_consent_v1` para lembrar por 6 meses as escolhas Necessários, Analytics e Marketing. O Consent Mode começa negado para `analytics_storage`, `ad_storage`, `ad_user_data` e `ad_personalization`.
+
+- **Somente necessários:** GTM, GA4 e Meta não são carregados.
+- **Analytics autorizado:** GA4 mede a visita sem liberar a Meta.
+- **Marketing autorizado:** o GTM é carregado com os sinais de consentimento e pode executar as tags publicitárias.
+- **Compra Meta:** continua exigindo também a opção de ofertas do checkout. `marketing_consent` só fica `true` quando as duas autorizações existem.
+
+O cookie próprio `acai_attribution_v1` guarda por até 90 dias, somente após autorização de Analytics ou Marketing, a primeira e a última origem. O pedido salva esses dados dentro de `customer.attribution`, sem enviar nome, telefone, e-mail ou endereço ao GA4.
+
+A camada de dados do evento `purchase` também disponibiliza:
+
+| Campo | Conteúdo |
+|---|---|
+| `utm_source` | Canal, como instagram, google ou whatsapp |
+| `utm_medium` | Meio, como paid_social, cpc ou mensagem |
+| `utm_campaign` | Nome da campanha |
+| `utm_content` | Anúncio ou criativo |
+| `utm_term` | Termo ou conjunto |
+| `traffic_referrer` | Domínio de referência |
+| `landing_page` | Página de entrada |
+| `cookie_marketing_consent` | Escolha de Marketing no banner |
+| `checkout_marketing_consent` | Opção de ofertas no checkout |
+
+Para relatórios personalizados no GA4, crie no GTM variáveis da camada de dados com os mesmos nomes e envie os cinco parâmetros UTM na tag de evento `purchase`. Depois registre-os no GA4 como dimensões personalizadas com escopo de evento.
+
 ## 6. Teste seguro
 
 Faça um pedido pequeno e confirme este roteiro:
