@@ -299,6 +299,7 @@
         `${address.street}, ${address.number}${address.complement ? ` — ${address.complement}` : ''}`,
         `${address.neighborhood} — ${address.city}${address.zip ? ` — CEP ${address.zip}` : ''}`
       );
+      if (address.deliveryRegion) lines.push(`Região de entrega: ${address.deliveryRegion}`);
       if (address.reference) lines.push(`Referência: ${address.reference}`);
       if (address.mapUrl) lines.push(`Mapa: ${address.mapUrl}`);
     } else {
