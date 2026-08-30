@@ -57,6 +57,11 @@
     settings.instagramUrl = settings.instagramUrl || '';
     settings.facebookUrl = settings.facebookUrl || '';
     settings.tiktokUrl = settings.tiktokUrl || '';
+    settings.seoTitle = settings.seoTitle || 'Açaí Delivery em Ji-Paraná | Cardápio Açaí do Bom';
+    settings.seoDescription = settings.seoDescription || 'Peça açaí delivery em Ji-Paraná com frutas, acompanhamentos e entrega própria. Monte seu pedido on-line no cardápio do Açaí do Bom.';
+    settings.faviconUrl = settings.faviconUrl || 'assets/images/favicon/favicon-48.png';
+    settings.deliveryZones = Array.isArray(settings.deliveryZones) ? settings.deliveryZones : [];
+    settings.blockedPostalCodes = Array.isArray(settings.blockedPostalCodes) ? settings.blockedPostalCodes : [];
     if (!settings.infoStripIcons || typeof settings.infoStripIcons !== 'object') settings.infoStripIcons = {};
     settings.infoStripIcons = {
       service: settings.infoStripIcons.service || '',
@@ -80,7 +85,10 @@
       ...category,
       imageUrl: category.imageUrl || categoryDefaults[category.id] || ''
     }));
-    catalog.products = catalog.products || [];
+    catalog.products = (catalog.products || []).map(product => ({
+      ...product,
+      addonGroups: (product.addonGroups || []).map(group => ({ ...group, priceMode: group.priceMode === 'final' ? 'final' : 'additive' }))
+    }));
   }
 
   function boot() {
@@ -88,6 +96,7 @@
     document.documentElement.style.setProperty('--brand', '#620853');
     document.documentElement.style.setProperty('--accent', '#fcd307');
     document.documentElement.style.setProperty('--brand-bright', '#620853');
+    applySeo(settings);
     renderLogo(settings.logoUrl, settings.storeName);
     $$('[data-store-name]').forEach(element => { element.textContent = settings.storeName; });
     $('#store-tagline').textContent = settings.tagline;
@@ -129,6 +138,58 @@
     } catch (error) {
       return '';
     }
+  }
+
+  function absoluteAsset(value, fallback = '') {
+    try {
+      const url = new URL(String(value || fallback), window.location.href);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function setMeta(selector, content) {
+    const tag = document.querySelector(selector);
+    if (tag && content) tag.setAttribute('content', content);
+  }
+
+  function applySeo(settings) {
+    const title = String(settings.seoTitle || settings.storeName || 'Açaí do Bom').trim();
+    const description = String(settings.seoDescription || settings.tagline || '').trim();
+    const favicon = absoluteAsset(settings.faviconUrl, 'assets/images/favicon/favicon-48.png');
+    const logo = absoluteAsset(settings.logoUrl, favicon);
+    const image = absoluteAsset(settings.bannerUrl, logo);
+    document.title = title;
+    setMeta('meta[name="description"]', description);
+    setMeta('meta[property="og:title"]', title);
+    setMeta('meta[property="og:description"]', description);
+    setMeta('meta[property="og:image"]', image);
+    setMeta('meta[name="twitter:title"]', title);
+    setMeta('meta[name="twitter:description"]', description);
+    setMeta('meta[name="twitter:image"]', image);
+    if (favicon) document.querySelectorAll('link[rel~="icon"]').forEach(link => { link.href = favicon; });
+    const schema = document.querySelector('#local-business-schema');
+    if (!schema) return;
+    const social = [settings.instagramUrl, settings.facebookUrl, settings.tiktokUrl].map(safeLink).filter(Boolean);
+    const data = {
+      '@context': 'https://schema.org',
+      '@type': 'Restaurant',
+      name: settings.establishmentName || settings.storeName || 'Açaí do Bom',
+      description,
+      url: new URL('/', window.location.origin).href,
+      image,
+      logo,
+      telephone: settings.contactPhone || settings.whatsapp || '',
+      email: settings.publicEmail || '',
+      servesCuisine: ['Açaí', 'Lanches', 'Pastéis'],
+      priceRange: 'R$',
+      address: { '@type': 'PostalAddress', streetAddress: settings.address || '', addressLocality: 'Ji-Paraná', addressRegion: 'RO', addressCountry: 'BR' },
+      areaServed: { '@type': 'City', name: 'Ji-Paraná' },
+      hasMenu: new URL('/#cardapio', window.location.origin).href
+    };
+    if (social.length) data.sameAs = social;
+    schema.textContent = JSON.stringify(data);
   }
 
   function renderFooter(settings) {
@@ -268,6 +329,13 @@
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
+  function startingPrice(product) {
+    const finalPrices = (product.addonGroups || [])
+      .filter(group => group.priceMode === 'final')
+      .flatMap(group => (group.options || []).filter(option => option.available !== false).map(option => Number(option.price)).filter(Number.isFinite));
+    return finalPrices.length ? Math.min(...finalPrices) : Number(product.price || 0);
+  }
+
   function renderProducts() {
     const products = list();
     const container = $('#products');
@@ -282,7 +350,7 @@
       return '<article class="product-card"><button type="button" data-product="' + escape(product.id) + '">' +
         '<div class="product-copy"><small>' + escape(category.name || 'Açaí do Bom') + '</small><h3>' + escape(product.name) + '</h3><p>' + escape(product.description) + '</p>' +
         (freeShipping ? '<em class="free-shipping">● ' + escape(freeShipping) + '</em>' : '') +
-        '<footer><b>' + MenuAPI.money(product.price) + '</b><span aria-hidden="true">＋</span></footer></div>' +
+        '<footer><b>' + ((product.addonGroups || []).some(group => group.priceMode === 'final') ? 'A partir de ' : '') + MenuAPI.money(startingPrice(product)) + '</b><span aria-hidden="true">＋</span></footer></div>' +
         '<div class="product-media">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + (product.badge ? '<b>' + escape(product.badge) + '</b>' : '') + '</div>' +
       '</button></article>';
     }).join('');
@@ -359,7 +427,7 @@
           return '<label class="addon-option' + (checked ? ' selected' : '') + '"><input type="' + (maximum === 1 ? 'radio' : 'checkbox') +
             '" name="group-' + escape(group.id) + '" value="' + escape(option.id) + '"' + (checked ? ' checked' : '') +
             '><span class="addon-option-media">' + optionMedia(option, group) + '</span><span class="addon-option-copy"><b>' +
-            escape(option.name) + '</b><small>' + (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso') +
+            escape(option.name) + '</b><small>' + (group.priceMode === 'final' ? MenuAPI.money(option.price) : (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso')) +
             '</small></span><i aria-hidden="true">✓</i></label>';
         }).join('') + '</div></fieldset>';
       bindImageFallbacks(addonList);
@@ -376,18 +444,19 @@
     quantity = 1;
     productStep = 0;
     const category = catalog.categories.find(item => item.id === selected.categoryId) || {};
+    const displayPrice = startingPrice(selected);
     MenuAPI.trackEcommerce('view_item', [{
       productId: selected.id,
       name: selected.name,
-      basePrice: selected.price,
-      unitTotal: selected.price,
+      basePrice: displayPrice,
+      unitTotal: displayPrice,
       quantity: 1
-    }], { value: selected.price });
+    }], { value: displayPrice });
     $('#product-image').src = selected.imageUrl || category.imageUrl || catalog.settings.bannerUrl;
     $('#product-image').alt = selected.name;
     $('#product-name').textContent = selected.name;
     $('#product-description').textContent = selected.description;
-    $('#product-base-price').textContent = 'A partir de ' + MenuAPI.money(selected.price);
+    $('#product-base-price').textContent = 'A partir de ' + MenuAPI.money(displayPrice);
     $('#item-notes').value = '';
     renderProductStep();
     $('#product-overlay').hidden = false;
@@ -425,7 +494,13 @@
   }
 
   function unitTotal() {
-    return Number(selected?.price || 0) + Object.values(selections).flat().reduce((sum, option) => sum + Number(option.price || 0), 0);
+    const groups = productGroups();
+    const finalGroup = groups.find(group => group.priceMode === 'final' && (selections[group.id] || []).length);
+    const base = finalGroup ? Number(selections[finalGroup.id][0].price || 0) : Number(selected?.price || 0);
+    const additions = groups
+      .filter(group => group.priceMode !== 'final')
+      .reduce((sum, group) => sum + (selections[group.id] || []).reduce((groupSum, option) => groupSum + Number(option.price || 0), 0), 0);
+    return base + additions;
   }
 
   function updateProductTotal() {
@@ -480,7 +555,7 @@
       quantity,
       selections: (selected.addonGroups || [])
         .filter(group => (selections[group.id] || []).length)
-        .map(group => ({ groupId: group.id, groupName: group.name, options: selections[group.id] })),
+        .map(group => ({ groupId: group.id, groupName: group.name, priceMode: group.priceMode || 'additive', options: selections[group.id] })),
       notes: $('#item-notes').value.trim(),
       unitTotal: unitTotal()
     };
