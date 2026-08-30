@@ -123,6 +123,11 @@
     if (typeof settings.instagramUrl !== 'string') set('instagramUrl', '');
     if (typeof settings.facebookUrl !== 'string') set('facebookUrl', '');
     if (typeof settings.tiktokUrl !== 'string') set('tiktokUrl', '');
+    if (typeof settings.seoTitle !== 'string' || !settings.seoTitle) set('seoTitle', 'Açaí Delivery em Ji-Paraná | Cardápio Açaí do Bom');
+    if (typeof settings.seoDescription !== 'string' || !settings.seoDescription) set('seoDescription', 'Peça açaí delivery em Ji-Paraná com frutas, acompanhamentos e entrega própria. Monte seu pedido on-line no cardápio do Açaí do Bom.');
+    if (typeof settings.faviconUrl !== 'string' || !settings.faviconUrl) set('faviconUrl', 'assets/images/favicon/favicon-48.png');
+    if (!Array.isArray(settings.deliveryZones)) { settings.deliveryZones = []; changed = true; }
+    if (!Array.isArray(settings.blockedPostalCodes)) { settings.blockedPostalCodes = []; changed = true; }
     if (!settings.infoStripIcons || typeof settings.infoStripIcons !== 'object') {
       settings.infoStripIcons = { service: '', time: '', delivery: '', payment: '' };
       changed = true;
@@ -193,7 +198,13 @@
       }
       return category;
     });
-    catalog.products = catalog.products || [];
+    catalog.products = (catalog.products || []).map(product => {
+      product.addonGroups = (product.addonGroups || []).map(group => {
+        if (!['additive', 'final'].includes(group.priceMode)) { group.priceMode = 'additive'; changed = true; }
+        return group;
+      });
+      return product;
+    });
     return changed;
   }
 
@@ -213,9 +224,11 @@
       '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
       '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
       '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText', '#payment-summary': 'paymentSummary',
-      '#order-redirect-url': 'orderRedirectUrl'
+      '#order-redirect-url': 'orderRedirectUrl', '#seo-title': 'seoTitle',
+      '#seo-description': 'seoDescription', '#favicon-url': 'faviconUrl'
     };
     Object.entries(fields).forEach(([selector, key]) => { $(selector).value = settings[key] ?? ''; });
+    $('#blocked-postal-codes').value = (settings.blockedPostalCodes || []).join('\n');
     $('#whatsapp-cloud-enabled').checked = Boolean(settings.whatsappCloudEnabled);
     $('#gateway-enabled').checked = Boolean(settings.gatewayEnabled);
     $('#order-redirect-enabled').checked = Boolean(settings.orderRedirectEnabled);
@@ -237,6 +250,7 @@
     $('#dashboard-date').value = customDashboardDate;
     renderCrmNotifications();
     renderHoursEditor();
+    renderDeliveryZones();
     renderInfoIcons();
     renderPreviews();
   }
@@ -256,11 +270,13 @@
       '#hero-highlight': 'heroHighlight', '#menu-eyebrow': 'menuEyebrow', '#menu-title': 'menuTitle',
       '#search-placeholder': 'searchPlaceholder', '#whatsapp-eyebrow': 'whatsappEyebrow',
       '#whatsapp-title': 'whatsappTitle', '#whatsapp-button-text': 'whatsappButtonText', '#payment-summary': 'paymentSummary',
-      '#order-redirect-url': 'orderRedirectUrl'
+      '#order-redirect-url': 'orderRedirectUrl', '#seo-title': 'seoTitle',
+      '#seo-description': 'seoDescription', '#favicon-url': 'faviconUrl'
     };
     Object.entries(fields).forEach(([selector, key]) => { settings[key] = $(selector).value.trim(); });
     settings.deliveryFee = Number($('#delivery-fee').value);
     settings.minOrder = Number($('#min-order').value);
+    settings.blockedPostalCodes = $('#blocked-postal-codes').value.split(/[\n,;]+/).map(value => value.trim()).filter(Boolean);
     settings.statusMode = $('#store-status-mode').value;
     settings.open = settings.statusMode !== 'closed';
     settings.primaryColor = '#620853';
@@ -281,6 +297,27 @@
     privateSettings.makeWebhookEnabled = $('#make-webhook-enabled').checked;
     privateSettings.makeWebhookUrl = $('#make-webhook-url').value.trim();
     collectHours();
+  }
+
+  function splitRuleValues(value) {
+    return String(value || '').split(/[,;\n]+/).map(item => item.trim()).filter(Boolean);
+  }
+
+  function renderDeliveryZones() {
+    const editor = $('#delivery-zones-editor');
+    const zones = catalog.settings.deliveryZones || (catalog.settings.deliveryZones = []);
+    editor.className = 'delivery-zones';
+    editor.innerHTML = zones.length ? zones.map(zone => `<article class="delivery-zone-row" data-delivery-zone="${esc(zone.id)}"><label>Nome da região<input data-zone-name value="${esc(zone.name || '')}" placeholder="Ex.: Centro"></label><label>Bairros<input data-zone-neighborhoods value="${esc((zone.neighborhoods || []).join(', '))}" placeholder="Centro, Urupá"></label><label>CEPs ou prefixos<input data-zone-postal value="${esc((zone.postalPrefixes || []).join(', '))}" placeholder="76900, 76901-000"></label><label>Taxa (R$)<input data-zone-fee type="number" step=".01" min="0" value="${Number(zone.fee || 0)}"></label><label class="delivery-toggle"><input data-zone-deliver type="checkbox" ${zone.deliver === false ? '' : 'checked'}> Entregar</label><button type="button" data-remove-zone>Excluir</button></article>`).join('') : '<div class="delivery-empty">Nenhuma regra regional. Será usada a taxa padrão em toda a área atendida.</div>';
+    editor.querySelectorAll('[data-delivery-zone]').forEach(row => {
+      const zone = zones.find(item => item.id === row.dataset.deliveryZone);
+      row.querySelector('[data-zone-name]').oninput = event => { zone.name = event.target.value; };
+      row.querySelector('[data-zone-neighborhoods]').oninput = event => { zone.neighborhoods = splitRuleValues(event.target.value); };
+      row.querySelector('[data-zone-postal]').oninput = event => { zone.postalPrefixes = splitRuleValues(event.target.value); };
+      row.querySelector('[data-zone-fee]').oninput = event => { zone.fee = Math.max(0, Number(event.target.value) || 0); };
+      row.querySelector('[data-zone-deliver]').onchange = event => { zone.deliver = event.target.checked; row.classList.toggle('blocked', !zone.deliver); };
+      row.querySelector('[data-remove-zone]').onclick = () => { catalog.settings.deliveryZones = zones.filter(item => item.id !== zone.id); renderDeliveryZones(); };
+      row.classList.toggle('blocked', zone.deliver === false);
+    });
   }
 
   function renderCrmNotifications() {
@@ -620,6 +657,7 @@
     lines.push('', `Subtotal: ${money(order.subtotal)}`, `Entrega: ${money(order.delivery_fee)}`, `TOTAL: ${money(order.total)}`, '', `Pagamento: ${paymentLabel(order.payment_method)}`);
     if (order.fulfillment === 'delivery') {
       lines.push('', 'ENDEREÇO DE ENTREGA', `${address.street || ''}, ${address.number || ''}${address.complement ? ` — ${address.complement}` : ''}`, `${address.neighborhood || ''} — ${address.city || ''}${address.zip ? ` — CEP ${address.zip}` : ''}`);
+      if (address.deliveryRegion) lines.push(`Região de entrega: ${address.deliveryRegion}`);
       if (address.reference) lines.push(`Referência: ${address.reference}`);
       if (address.mapUrl) lines.push(`Mapa: ${address.mapUrl}`);
     } else {
@@ -659,14 +697,14 @@
       const whatsappPhone = phone.startsWith('55') ? phone : `55${phone}`;
       const itemsHtml = items.map(item => {
         const additions = (item.selections || []).map(selection => {
-          const options = (selection.options || []).map(option => `${esc(option.name)}${Number(option.price || 0) ? ` (+${money(option.price)})` : ''}`).join(', ');
+          const options = (selection.options || []).map(option => `${esc(option.name)}${Number(option.price || 0) ? (selection.priceMode === 'final' ? ` (${money(option.price)})` : ` (+${money(option.price)})`) : ''}`).join(', ');
           return `<small><b>${esc(selection.groupName)}:</b> ${options}</small>`;
         }).join('');
         return `<div class="order-item"><b>${Number(item.quantity || 1)}x ${esc(item.name)}</b><strong>${money(Number(item.unitTotal || 0) * Number(item.quantity || 1))}</strong>${additions}${item.notes ? `<small><b>Observação:</b> ${esc(item.notes)}</small>` : ''}</div>`;
       }).join('');
       const mapUrl = /^https:\/\/www\.google\.com\/maps\//.test(address.mapUrl || '') ? address.mapUrl : '';
       const addressHtml = order.fulfillment === 'delivery'
-        ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.reference ? `<br><b>Referência:</b> ${esc(address.reference)}` : ''}${mapUrl ? `<br><a class="map-link" href="${esc(mapUrl)}" target="_blank" rel="noopener">Abrir localização no mapa</a>` : ''}</div>`
+        ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.deliveryRegion ? `<br><b>Região de entrega:</b> ${esc(address.deliveryRegion)}` : ''}${address.reference ? `<br><b>Referência:</b> ${esc(address.reference)}` : ''}${mapUrl ? `<br><a class="map-link" href="${esc(mapUrl)}" target="_blank" rel="noopener">Abrir localização no mapa</a>` : ''}</div>`
         : '<div class="order-address"><b>🏪 Retirada no local</b><br>Cliente buscará o pedido na loja.</div>';
       const paymentClass = order.payment_status === 'pago' ? 'paid' : order.payment_status === 'estornado' ? 'refunded' : 'pending';
       const nextAction = nextOrderAction(order);
@@ -937,6 +975,7 @@
     const settings = catalog.settings;
     $('#logo-preview').innerHTML = settings.logoUrl ? `<img src="${esc(preview(settings.logoUrl))}">` : 'A';
     $('#banner-preview').innerHTML = settings.bannerUrl ? `<img src="${esc(preview(settings.bannerUrl))}">` : '◈';
+    $('#favicon-preview').innerHTML = settings.faviconUrl ? `<img src="${esc(preview(settings.faviconUrl))}" alt="">` : 'A';
     const offerImage = settings.dailyOffer?.imageUrl || $('#daily-offer-image')?.value || '';
     $('#daily-offer-preview').innerHTML = offerImage ? `<img src="${esc(preview(offerImage))}" alt="">` : 'OFERTA';
     $$('.admin-logo img').forEach(image => { image.src = preview(settings.logoUrl || 'assets/images/logo/logo-acai-do-bom.webp'); });
@@ -978,20 +1017,32 @@
   function renderGroups() {
     $('#addon-groups').innerHTML = (editing.addonGroups || []).map(group => {
       group.options = group.options || [];
-      return `<article data-group="${esc(group.id)}"><header><input value="${esc(group.name)}" data-group-name><label><input type="checkbox" data-group-required ${group.required ? 'checked' : ''}> Obrigatório</label><label>Máx.<input type="number" min="1" value="${group.max || 1}" data-group-max></label><button type="button" data-remove-group>×</button></header>` +
-        `<div class="options">${group.options.map(option => `<div class="option-row" data-option="${esc(option.id)}"><div class="option-thumb">${option.imageUrl ? `<img src="${esc(preview(option.imageUrl))}" alt="">` : '🥣'}</div><div class="option-fields"><input value="${esc(option.name)}" data-option-name placeholder="Nome do acompanhamento"><input value="${esc(option.imageUrl || '')}" data-option-image placeholder="URL da imagem"></div><label class="option-upload">Trocar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-option-upload></label><input class="option-price" aria-label="Preço adicional" type="number" step=".01" value="${Number(option.price || 0)}" data-option-price><button type="button" data-remove-option aria-label="Excluir acompanhamento">🗑</button></div>`).join('')}<button type="button" data-add-option>+ Adicionar opção</button></div></article>`;
+      group.priceMode = group.priceMode === 'final' ? 'final' : 'additive';
+      const priceHelp = group.priceMode === 'final' ? 'Digite o preço total de cada tamanho.' : 'Digite somente o acréscimo sobre o preço base.';
+      return `<article data-group="${esc(group.id)}"><header><input value="${esc(group.name)}" data-group-name><label><input type="checkbox" data-group-required ${group.required ? 'checked' : ''}> Obrigatório</label><label>Máx.<input type="number" min="1" value="${group.max || 1}" data-group-max></label><label class="group-price-mode">Tipo de preço<select data-group-price-mode><option value="additive" ${group.priceMode === 'additive' ? 'selected' : ''}>Acréscimo (+)</option><option value="final" ${group.priceMode === 'final' ? 'selected' : ''}>Preço final por tamanho</option></select></label><button type="button" data-remove-group>×</button></header><small class="group-price-help">${priceHelp}</small>` +
+        `<div class="options">${group.options.map(option => `<div class="option-row" data-option="${esc(option.id)}"><div class="option-thumb">${option.imageUrl ? `<img src="${esc(preview(option.imageUrl))}" alt="">` : '🥣'}</div><div class="option-fields"><input value="${esc(option.name)}" data-option-name placeholder="Nome do acompanhamento ou tamanho"><input value="${esc(option.imageUrl || '')}" data-option-image placeholder="URL da imagem"></div><label class="option-upload">Trocar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-option-upload></label><input class="option-price ${group.priceMode === 'final' ? 'final-price' : ''}" aria-label="${group.priceMode === 'final' ? 'Preço final' : 'Preço adicional'}" type="number" step=".01" min="0" value="${Number(option.price || 0)}" data-option-price><button type="button" data-remove-option aria-label="Excluir opção">🗑</button></div>`).join('')}<button type="button" data-add-option>+ Adicionar opção</button></div></article>`;
     }).join('');
     $('#addon-groups').querySelectorAll('[data-group]').forEach(card => {
       const group = editing.addonGroups.find(item => item.id === card.dataset.group);
       card.querySelector('[data-group-name]').oninput = event => { group.name = event.target.value; };
       card.querySelector('[data-group-required]').onchange = event => { group.required = event.target.checked; group.min = event.target.checked ? 1 : 0; };
       card.querySelector('[data-group-max]').oninput = event => { group.max = Math.max(1, Number(event.target.value)); };
+      card.querySelector('[data-group-price-mode]').onchange = event => {
+        const nextMode = event.target.value === 'final' ? 'final' : 'additive';
+        if (nextMode === group.priceMode) return;
+        const base = Number($('#edit-price').value || editing.price || 0);
+        group.options.forEach(option => {
+          option.price = Number((nextMode === 'final' ? Number(option.price || 0) + base : Math.max(0, Number(option.price || 0) - base)).toFixed(2));
+        });
+        group.priceMode = nextMode;
+        renderGroups();
+      };
       card.querySelector('[data-remove-group]').onclick = () => { editing.addonGroups = editing.addonGroups.filter(item => item.id !== group.id); renderGroups(); };
-      card.querySelector('[data-add-option]').onclick = () => { group.options.push({ id: crypto.randomUUID(), name: '', price: 0, imageUrl: '', available: true }); renderGroups(); };
+      card.querySelector('[data-add-option]').onclick = () => { group.options.push({ id: crypto.randomUUID(), name: '', price: group.priceMode === 'final' ? Number($('#edit-price').value || editing.price || 0) : 0, imageUrl: '', available: true }); renderGroups(); };
       card.querySelectorAll('[data-option]').forEach(row => {
         const option = group.options.find(item => item.id === row.dataset.option);
         row.querySelector('[data-option-name]').oninput = event => { option.name = event.target.value; };
-        row.querySelector('[data-option-price]').oninput = event => { option.price = Number(event.target.value); };
+        row.querySelector('[data-option-price]').oninput = event => { option.price = Math.max(0, Number(event.target.value) || 0); };
         row.querySelector('[data-option-image]').onchange = event => { option.imageUrl = event.target.value.trim(); renderGroups(); };
         row.querySelector('[data-option-upload]').onchange = event => upload(event.target, 'option', option.id);
         row.querySelector('[data-remove-option]').onclick = () => { group.options = group.options.filter(item => item.id !== option.id); renderGroups(); };
@@ -1007,10 +1058,11 @@
     holder?.classList.add('busy');
     try {
       notice('Otimizando e enviando imagem...');
-      const folders = { logo: 'logo', banner: 'banner', product: 'produtos', category: 'categorias', option: 'acompanhamentos', notification: 'mensagens', infoIcon: 'icones', offer: 'ofertas' };
+      const folders = { logo: 'logo', banner: 'banner', favicon: 'favicon', product: 'produtos', category: 'categorias', option: 'acompanhamentos', notification: 'mensagens', infoIcon: 'icones', offer: 'ofertas' };
       const url = await SupabaseStore.uploadImage(file, folders[target] || 'geral');
       if (target === 'logo') { catalog.settings.logoUrl = url; $('#logo-url').value = url; }
       if (target === 'banner') { catalog.settings.bannerUrl = url; $('#banner-url').value = url; }
+      if (target === 'favicon') { catalog.settings.faviconUrl = url; $('#favicon-url').value = url; }
       if (target === 'offer') {
         catalog.settings.dailyOffer.imageUrl = url;
         $('#daily-offer-image').value = url;
@@ -1035,7 +1087,7 @@
         renderCrmNotifications();
       }
       renderPreviews();
-      if (target === 'logo' || target === 'banner' || target === 'category' || target === 'infoIcon' || target === 'offer') {
+      if (target === 'logo' || target === 'banner' || target === 'favicon' || target === 'category' || target === 'infoIcon' || target === 'offer') {
         await SupabaseStore.saveCatalog(catalog);
         if (target === 'category') renderCategories();
         notice('Imagem armazenada e publicada no cardápio.');
@@ -1214,7 +1266,8 @@
         button.textContent = 'Confirmar e publicar produto';
       }
     };
-    $('#add-group').onclick = () => { editing.addonGroups.push({ id: crypto.randomUUID(), name: 'Novo grupo', required: false, min: 0, max: 1, options: [] }); renderGroups(); };
+    $('#add-group').onclick = () => { editing.addonGroups.push({ id: crypto.randomUUID(), name: 'Novo grupo', required: false, min: 0, max: 1, priceMode: 'additive', options: [] }); renderGroups(); };
+    $('#add-delivery-zone').onclick = () => { catalog.settings.deliveryZones.push({ id: crypto.randomUUID(), name: 'Nova região', neighborhoods: [], postalPrefixes: [], fee: Number(catalog.settings.deliveryFee || 0), deliver: true }); renderDeliveryZones(); };
     $('#cancel-delete').onclick = () => {
       $('#confirm-delete').hidden = true;
       document.body.classList.remove('dialog-open');
@@ -1250,6 +1303,7 @@
     $$('[data-upload]').forEach(input => { input.onchange = () => upload(input, input.dataset.upload); });
     $('#logo-url').oninput = event => { catalog.settings.logoUrl = event.target.value; renderPreviews(); };
     $('#banner-url').oninput = event => { catalog.settings.bannerUrl = event.target.value; renderPreviews(); };
+    $('#favicon-url').oninput = event => { catalog.settings.faviconUrl = event.target.value; renderPreviews(); };
     $('#daily-offer-image').oninput = event => { catalog.settings.dailyOffer.imageUrl = event.target.value.trim(); renderPreviews(); };
     $('#edit-image').oninput = event => { if (editing) { editing.imageUrl = event.target.value; renderProductPhoto(); } };
     $('#remove-product-image').onclick = () => {
