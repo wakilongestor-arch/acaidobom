@@ -16,21 +16,22 @@
         "required": true,
         "min": 1,
         "max": 1,
+        "priceMode": "final",
         "options": [
           {
             "id": "300",
             "name": "300 ml",
-            "price": 0
+            "price": 16.9
           },
           {
             "id": "500",
             "name": "500 ml",
-            "price": 8
+            "price": 24.9
           },
           {
             "id": "700",
             "name": "700 ml",
-            "price": 14
+            "price": 30.9
           }
         ]
       },
@@ -266,16 +267,17 @@
         "required": true,
         "min": 1,
         "max": 1,
+        "priceMode": "final",
         "options": [
           {
             "id": "medium",
             "name": "Média",
-            "price": 0
+            "price": 18.9
           },
           {
             "id": "large",
             "name": "Grande",
-            "price": 8
+            "price": 26.9
           }
         ]
       }
