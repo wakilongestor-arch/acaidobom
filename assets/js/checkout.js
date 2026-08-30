@@ -12,6 +12,48 @@
     return String(value || '').replace(/\D/g, '').slice(-11);
   }
 
+  function normalizeText(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizePostalCode(value) {
+    return String(value || '').replace(/\D/g, '').slice(0, 8);
+  }
+
+  function postalMatches(zip, pattern) {
+    const rule = normalizePostalCode(pattern);
+    return Boolean(zip && rule && (rule.length === 8 ? zip === rule : zip.startsWith(rule)));
+  }
+
+  function deliveryQuote(data = formData()) {
+    if (data.fulfillment === 'pickup') return { fee: 0, blocked: false, zone: null, message: 'Retirada no local: sem taxa de entrega.' };
+    const settings = catalog?.settings || {};
+    const zip = normalizePostalCode(data.zip);
+    const neighborhood = normalizeText(data.neighborhood);
+    const blockedPostal = (settings.blockedPostalCodes || []).find(pattern => postalMatches(zip, pattern));
+    if (blockedPostal) return { fee: 0, blocked: true, zone: null, message: 'Este CEP está fora da área de entrega. Escolha retirada ou fale com a loja.' };
+    const zone = (settings.deliveryZones || []).find(rule => {
+      const postal = (rule.postalPrefixes || []).some(pattern => postalMatches(zip, pattern));
+      const area = (rule.neighborhoods || []).some(name => normalizeText(name) === neighborhood);
+      return postal || (neighborhood && area);
+    }) || null;
+    if (zone?.deliver === false) return { fee: 0, blocked: true, zone, message: `${zone.name || 'Esta região'} está fora da área de entrega. Escolha retirada ou fale com a loja.` };
+    const fee = zone ? Math.max(0, Number(zone.fee) || 0) : Math.max(0, Number(settings.deliveryFee) || 0);
+    return { fee, blocked: false, zone, message: zone ? `Entrega para ${zone.name}: ${MenuAPI.money(fee)}.` : `Taxa padrão de entrega: ${MenuAPI.money(fee)}.` };
+  }
+
+  function renderDeliveryQuote() {
+    const element = $('#delivery-quote');
+    if (!element || !catalog) return deliveryQuote();
+    const data = formData();
+    const quote = deliveryQuote(data);
+    const incomplete = data.fulfillment === 'delivery' && (!normalizePostalCode(data.zip) || !normalizeText(data.neighborhood));
+    element.textContent = incomplete ? 'Informe o CEP e o bairro para confirmar a taxa e a área de entrega.' : quote.message;
+    element.classList.toggle('blocked', !incomplete && quote.blocked);
+    element.classList.toggle('matched', !incomplete && !quote.blocked);
+    return quote;
+  }
+
   function readProfiles() {
     try { return JSON.parse(localStorage.getItem(profileStorageKey) || '{}'); }
     catch (error) { return {}; }
@@ -50,6 +92,7 @@
     if (profile.address?.latitude && profile.address?.longitude) {
       showLocationStatus('Localização salva recuperada para esta entrega.', true);
     }
+    renderDeliveryQuote();
   }
 
   function saveProfile(payload) {
@@ -165,6 +208,7 @@
     $('#checkout-next').hidden = step === 3;
     $('#checkout-submit').hidden = step !== 3;
     $('#checkout-error').hidden = true;
+    renderDeliveryQuote();
     if (step === 3) {
       renderPayments();
       renderSummary();
@@ -183,8 +227,12 @@
     if (step === 1 && (!String(data.name || '').trim() || String(data.phone || '').replace(/\D/g, '').length < 10 || !emailValid)) {
       message = 'Informe seu nome, um WhatsApp válido e o e-mail que receberá a confirmação.';
     }
-    if (step === 2 && data.fulfillment === 'delivery' && (!data.street || !data.number || !data.neighborhood || !data.city)) {
-      message = 'Preencha rua, número, bairro e cidade.';
+    if (step === 2 && data.fulfillment === 'delivery' && (!data.street || !data.number || !data.neighborhood || !data.city || normalizePostalCode(data.zip).length !== 8)) {
+      message = 'Preencha CEP, rua, número, bairro e cidade.';
+    }
+    if (step === 2 && data.fulfillment === 'delivery' && !message) {
+      const quote = deliveryQuote(data);
+      if (quote.blocked) message = quote.message;
     }
     if (message) {
       error.textContent = message;
@@ -213,12 +261,13 @@
   }
 
   function renderSummary() {
-    const delivery = formData().fulfillment === 'delivery' ? Number(catalog.settings.deliveryFee) : 0;
+    const quote = deliveryQuote();
+    const delivery = quote.fee;
     const total = CartStore.subtotal() + delivery;
     $('#order-summary').innerHTML = '<h3>Resumo</h3>' +
       CartStore.get().map(item => `<div><span>${item.quantity}x ${item.name}</span><b>${MenuAPI.money(item.unitTotal * item.quantity)}</b></div>`).join('') +
       `<hr><div><span>Subtotal</span><b>${MenuAPI.money(CartStore.subtotal())}</b></div>` +
-      `<div><span>Entrega</span><b>${MenuAPI.money(delivery)}</b></div>` +
+      `<div><span>${quote.zone?.name ? `Entrega · ${quote.zone.name}` : 'Entrega'}</span><b>${MenuAPI.money(delivery)}</b></div>` +
       `<div class="total"><span>Total</span><b>${MenuAPI.money(total)}</b></div>`;
     $('#checkout-submit').textContent = `Confirmar · ${MenuAPI.money(total)}`;
   }
@@ -233,7 +282,20 @@
       return;
     }
     const data = formData();
-    const delivery = data.fulfillment === 'delivery' ? Number(catalog.settings.deliveryFee) : 0;
+    const quote = deliveryQuote(data);
+    const delivery = quote.fee;
+    if (data.fulfillment === 'delivery' && (normalizePostalCode(data.zip).length !== 8 || !String(data.neighborhood || '').trim())) {
+      const error = $('#checkout-error');
+      error.textContent = 'Informe um CEP válido e o bairro para confirmar a entrega.';
+      error.hidden = false;
+      return;
+    }
+    if (quote.blocked) {
+      const error = $('#checkout-error');
+      error.textContent = quote.message;
+      error.hidden = false;
+      return;
+    }
     if (CartStore.subtotal() < Number(catalog.settings.minOrder) && data.fulfillment === 'delivery') {
       const error = $('#checkout-error');
       error.textContent = `O pedido mínimo é ${MenuAPI.money(catalog.settings.minOrder)}.`;
@@ -262,7 +324,7 @@
       address: {
         zip: data.zip || '', street: data.street || '', number: data.number || '',
         complement: data.complement || '', neighborhood: data.neighborhood || '',
-        reference: data.reference || '', city: data.city || '',
+        reference: data.reference || '', city: data.city || '', deliveryRegion: quote.zone?.name || '',
         latitude: data.latitude || '', longitude: data.longitude || '',
         mapUrl: data.latitude && data.longitude ? `https://www.google.com/maps?q=${encodeURIComponent(data.latitude)},${encodeURIComponent(data.longitude)}` : ''
       },
@@ -356,8 +418,18 @@
       phoneTimer = setTimeout(restoreProfile, 350);
     });
     phone.addEventListener('blur', restoreProfile);
+    const checkoutForm = $('#checkout-form');
+    const zip = checkoutForm.elements.namedItem('zip');
+    const neighborhood = checkoutForm.elements.namedItem('neighborhood');
+    zip.addEventListener('input', () => {
+      const digits = normalizePostalCode(zip.value);
+      zip.value = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+      renderDeliveryQuote();
+      if (step === 3) renderSummary();
+    });
+    neighborhood.addEventListener('input', () => { renderDeliveryQuote(); if (step === 3) renderSummary(); });
     document.querySelectorAll('input[name=fulfillment]').forEach(input => {
-      input.addEventListener('change', () => { $('#address-fields').hidden = input.value === 'pickup'; });
+      input.addEventListener('change', () => { $('#address-fields').hidden = input.value === 'pickup'; renderDeliveryQuote(); if (step === 3) renderSummary(); });
     });
   }
 
