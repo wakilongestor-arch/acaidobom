@@ -38,6 +38,7 @@
       return postal || (neighborhood && area);
     }) || null;
     if (zone?.deliver === false) return { fee: 0, blocked: true, zone, message: `${zone.name || 'Esta região'} está fora da área de entrega. Escolha retirada ou fale com a loja.` };
+    if (CartStore.hasFreeShipping?.()) return { fee: 0, blocked: false, zone, freeShipping: true, message: 'Entrega grátis aplicada pelo produto selecionado.' };
     const fee = zone ? Math.max(0, Number(zone.fee) || 0) : Math.max(0, Number(settings.deliveryFee) || 0);
     return { fee, blocked: false, zone, message: zone ? `Entrega para ${zone.name}: ${MenuAPI.money(fee)}.` : `Taxa padrão de entrega: ${MenuAPI.money(fee)}.` };
   }
