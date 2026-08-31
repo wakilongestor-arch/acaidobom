@@ -372,7 +372,7 @@ button,a,label{touch-action:manipulation}
 /* Indicador de funcionamento com atenção contínua sem mudar o formato. */
 .open-status{
   position:relative;
-  animation:store-open-attention 1.8s ease-in-out infinite;
+  animation:store-open-attention 2.8s ease-in-out infinite;
   will-change:transform,box-shadow;
 }
 .open-status::before{
@@ -382,31 +382,31 @@ button,a,label{touch-action:manipulation}
   background:var(--brand);
   border:2px solid #fff;
   box-shadow:0 0 0 0 rgba(255,255,255,.7);
-  animation:status-dot-pulse 1.5s ease-out infinite;
+  animation:status-dot-pulse 2.6s ease-out infinite;
 }
 .open-status.closed{
   border-color:#ff5a36;
   background:#e63b24;
   color:#fff;
   box-shadow:0 0 0 0 rgba(230,59,36,.65);
-  animation:store-closed-attention 1.25s ease-in-out infinite;
+  animation:store-closed-attention 2.3s ease-in-out infinite;
 }
 .open-status.closed::before{
   background:var(--brand);
   border:2px solid #fff;
-  animation:status-dot-pulse 1.25s ease-out infinite;
+  animation:status-dot-pulse 2.1s ease-out infinite;
 }
 @keyframes store-open-attention{
-  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(34,197,94,.55)}
-  50%{transform:scale(1.035);box-shadow:0 0 0 7px rgba(34,197,94,0)}
+  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(34,197,94,.28)}
+  50%{transform:scale(1.008);box-shadow:0 0 0 4px rgba(34,197,94,0)}
 }
 @keyframes store-closed-attention{
-  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(230,59,36,.62)}
-  50%{transform:scale(1.055);box-shadow:0 0 0 9px rgba(230,59,36,0)}
+  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(230,59,36,.34)}
+  50%{transform:scale(1.012);box-shadow:0 0 0 5px rgba(230,59,36,0)}
 }
 @keyframes status-dot-pulse{
-  0%{box-shadow:0 0 0 0 rgba(255,255,255,.75)}
-  75%,100%{box-shadow:0 0 0 6px rgba(255,255,255,0)}
+  0%{box-shadow:0 0 0 0 rgba(255,255,255,.45)}
+  75%,100%{box-shadow:0 0 0 3px rgba(255,255,255,0)}
 }
 @media(prefers-reduced-motion:reduce){
   .open-status,.open-status::before,.open-status.closed,.open-status.closed::before{animation:none}
