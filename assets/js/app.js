@@ -405,7 +405,7 @@
     const addonList = $('#addon-list');
     $('#product-step-label').textContent = 'Etapa ' + (productStep + 1) + ' de ' + total;
     $('#product-step-title').textContent = isReview ? 'Revise e confirme' : group.name;
-    $('#product-step-back').textContent = productStep ? '← Voltar' : 'Cancelar';
+    $('#product-step-back').textContent = productStep ? 'Voltar' : 'Cancelar';
     $('#product-notes').hidden = !isReview;
     $('#product-quantity').hidden = !isReview;
     $('#product-overlay .modal-footer').classList.toggle('review-mode', isReview);
@@ -429,7 +429,7 @@
             '" name="group-' + escape(group.id) + '" value="' + escape(option.id) + '"' + (checked ? ' checked' : '') +
             '><span class="addon-option-media">' + optionMedia(option, group) + '</span><span class="addon-option-copy"><b>' +
             escape(option.name) + '</b><small>' + (group.priceMode === 'final' ? MenuAPI.money(option.price) : (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso')) +
-            '</small></span><i aria-hidden="true">✓</i></label>';
+            '</small></span><i aria-hidden="true">＋</i></label>';
         }).join('') + '</div></fieldset>';
       bindImageFallbacks(addonList);
     }
@@ -457,7 +457,11 @@
     $('#product-image').alt = selected.name;
     $('#product-name').textContent = selected.name;
     $('#product-description').textContent = selected.description;
-    $('#product-base-price').textContent = 'A partir de ' + MenuAPI.money(displayPrice);
+    $('#product-base-price').textContent = MenuAPI.money(displayPrice);
+    const freeShipping = selected.freeShippingEnabled === true;
+    $('#product-modal-free-badge').hidden = !freeShipping;
+    $('#product-delivery-label').textContent = freeShipping ? 'entrega grátis' : 'Com entrega';
+    $('#product-delivery-label').classList.toggle('free', freeShipping);
     $('#item-notes').value = '';
     renderProductStep();
     $('#product-overlay').hidden = false;
@@ -506,10 +510,10 @@
 
   function updateProductTotal() {
     $('#item-quantity').textContent = quantity;
+    const total = unitTotal() * quantity;
     const isReview = productStep >= productGroups().length;
-    $('#add-to-cart').textContent = isReview
-      ? 'Adicionar · ' + MenuAPI.money(unitTotal() * quantity)
-      : 'Continuar →';
+    $('#product-action-price').textContent = MenuAPI.money(total);
+    $('#add-to-cart').textContent = isReview ? 'Adicionar' : 'Continuar';
   }
 
   function advanceProduct() {
