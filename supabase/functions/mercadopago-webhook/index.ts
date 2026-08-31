@@ -29,6 +29,8 @@ async function validSignature(req: Request, dataId: string, secret: string) {
   const requestId = req.headers.get('x-request-id') || '';
   const parts = Object.fromEntries(header.split(',').map(part => part.trim().split('=')));
   if (!parts.ts || !parts.v1 || !requestId || !dataId) return false;
+  const timestamp = Number(parts.ts);
+  if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;
   const manifest = `id:${dataId};request-id:${requestId};ts:${parts.ts};`;
   return timingSafeEqual(await hmacHex(secret, manifest), String(parts.v1));
 }

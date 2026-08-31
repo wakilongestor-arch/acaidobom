@@ -104,28 +104,13 @@
     return { ...row.data, available: true };
   }
 
-  async function createOrder(payload, orderNumber) {
+  async function createOrder(payload) {
     const db = getClient();
     if (!db) return false;
-    const row = {
-      id: crypto.randomUUID(),
-      order_number: orderNumber,
-      customer: payload.customer,
-      fulfillment: payload.fulfillment,
-      address: payload.address,
-      payment_method: payload.paymentMethod,
-      change_for: payload.changeFor || '',
-      notes: payload.notes || '',
-      items: payload.items,
-      subtotal: Number(payload.subtotal || 0),
-      delivery_fee: Number(payload.deliveryFee || 0),
-      total: Number(payload.total || 0),
-      status: 'novo',
-      payment_status: 'pendente'
-    };
-    const { error } = await db.from('orders').insert(row);
+    const { data, error } = await db.functions.invoke('create-order', { body: { payload } });
     throwIfError(error, 'Não foi possível registrar o pedido.');
-    return { id: row.id, order_number: row.order_number };
+    if (!data?.id || !data?.order_number) throw new Error('O servidor não confirmou o pedido.');
+    return data;
   }
 
   async function notifyOrder(orderId) {

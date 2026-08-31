@@ -17,6 +17,12 @@ Deno.serve(async req => {
   const { data: order, error } = await db.from('orders').select('*').eq('id', orderId).single();
   if (error || !order) return json({ error: 'Pedido não encontrado.' }, 404);
   const customer = order.customer || {};
+  const allowedProvider = provider === 'mercadopago' || provider === 'custom';
+  if (!allowedProvider) return json({ error: 'Provedor de pagamento inválido.' }, 400);
+  if (order.payment_method !== 'payment_link') return json({ error: 'Este pedido não usa pagamento on-line.' }, 409);
+  if (['cancelado', 'concluido'].includes(String(order.status || '')) || order.payment_status === 'pago') return json({ error: 'Este pedido não pode gerar um novo checkout.' }, 409);
+  const createdAt = new Date(order.created_at).getTime();
+  if (!Number.isFinite(createdAt) || Date.now() - createdAt > 30 * 60 * 1000) return json({ error: 'O prazo para iniciar este pagamento expirou.' }, 403);
 
   let response: Response;
   if (provider === 'mercadopago') {

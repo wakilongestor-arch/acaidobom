@@ -430,3 +430,22 @@ body.dialog-open{overflow:hidden}
 .admin-free-shipping img{width:17px;height:17px;display:block;flex:0 0 auto}
 .admin-free-shipping b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:900}
 .free-shipping-label-field[hidden]{display:none!important}
+
+
+/* Correções de estabilidade de rolagem e overflow. */
+html,body{min-height:100%;overflow-x:hidden}
+.admin-layout>main{min-width:0}
+.dialog{overflow-y:auto;overscroll-behavior:contain}
+.dialog>form{min-height:0;overflow:hidden}
+.editor-scroll{min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.orders-board,.orders-list-view,.product-list,.customer-table-card{min-width:0;overscroll-behavior:contain}
+@media(max-width:900px){
+  .admin-layout>main{overflow-x:hidden}
+  .orders-board{padding-inline:0}
+}
+@media(max-width:680px){
+  .dialog>form{height:100dvh;max-height:100dvh}
+  .editor-scroll{overflow-y:auto;overflow-x:hidden}
+  .orders-board{width:100%;max-width:100vw;overflow-x:auto}
+}
+@media(prefers-reduced-motion:reduce){.dialog,.orders-board{scroll-behavior:auto}}

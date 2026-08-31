@@ -28,6 +28,25 @@ create table if not exists public.order_webhook_events (
 create index if not exists order_webhook_events_order_idx
   on public.order_webhook_events (order_id, created_at desc);
 
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+revoke all on public.admin_users from anon, authenticated;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false)
+    or exists (select 1 from public.admin_users where user_id = auth.uid());
+$$;
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to anon, authenticated, service_role;
+
 alter table public.private_settings enable row level security;
 alter table public.order_webhook_events enable row level security;
 
@@ -35,20 +54,20 @@ drop policy if exists "administrador gerencia configuracoes privadas" on public.
 create policy "administrador gerencia configuracoes privadas"
   on public.private_settings for all
   to authenticated
-  using (true)
-  with check (true);
+  using (public.is_admin())
+  with check (public.is_admin());
 
 drop policy if exists "administrador le historico de webhooks" on public.order_webhook_events;
 create policy "administrador le historico de webhooks"
   on public.order_webhook_events for select
   to authenticated
-  using (true);
+  using (public.is_admin());
 
 drop policy if exists "administrador exclui pedidos" on public.orders;
 create policy "administrador exclui pedidos"
   on public.orders for delete
   to authenticated
-  using (true);
+  using (public.is_admin());
 
 grant select, insert, update, delete on public.private_settings to authenticated;
 grant select on public.order_webhook_events to authenticated;
