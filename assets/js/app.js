@@ -350,7 +350,7 @@
       return '<article class="product-card"><button type="button" data-product="' + escape(product.id) + '">' +
         '<div class="product-copy"><small>' + escape(category.name || 'Açaí do Bom') + '</small><h3>' + escape(product.name) + '</h3><p>' + escape(product.description) + '</p>' +
         (freeShipping ? '<em class="free-shipping">● ' + escape(freeShipping) + '</em>' : '') +
-        '<footer><b>' + ((product.addonGroups || []).some(group => group.priceMode === 'final') ? 'A partir de ' : '') + MenuAPI.money(startingPrice(product)) + '</b><span aria-hidden="true">＋</span></footer></div>' +
+        '<footer><b class="product-price">' + ((product.addonGroups || []).some(group => group.priceMode === 'final') ? '<small>A partir de</small>' : '') + '<strong>' + MenuAPI.money(startingPrice(product)) + '</strong></b><span aria-hidden="true">＋</span></footer></div>' +
         '<div class="product-media">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + (product.badge ? '<b>' + escape(product.badge) + '</b>' : '') + '</div>' +
       '</button></article>';
     }).join('');
