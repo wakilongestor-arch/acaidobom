@@ -21,6 +21,10 @@
   let customDashboardDate = '';
   let customerQuery = '';
   let customerConsentFilter = 'all';
+  let productQuery = '';
+  let productCategoryFilter = 'all';
+  let productStatusFilter = 'all';
+  const collapsedProductCategories = new Set();
   const weekDays = [
     ['sun', 'Domingo'], ['mon', 'Segunda'], ['tue', 'Terça'], ['wed', 'Quarta'],
     ['thu', 'Quinta'], ['fri', 'Sexta'], ['sat', 'Sábado']
@@ -30,6 +34,7 @@
     lanches: 'assets/images/categories/lanches.jpg',
     pasteis: 'assets/images/categories/pasteis.jpg'
   };
+  const normalizeText = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const crmNotificationDefaults = {
     confirmed: { label: 'Pedido confirmado e em preparo', enabled: true, title: 'Pedido confirmado! 🎉', message: 'Olá, {primeiro_nome}! Seu pedido {pedido} foi confirmado e já está sendo preparado com todo carinho.', imageUrl: '' },
     out_for_delivery: { label: 'Saiu para entrega', enabled: true, title: 'Seu pedido está a caminho! 🛵', message: '{primeiro_nome}, seu pedido {pedido} saiu para entrega. Fique de olho!', imageUrl: '' }
@@ -1042,26 +1047,99 @@
   }
 
   function renderProducts() {
-    $('#product-count').textContent = `${catalog.products.length} produtos cadastrados`;
-    $('#admin-products').innerHTML = catalog.products.map(product => {
-      const category = catalog.categories.find(item => item.id === product.categoryId);
-      const imageUrl = product.imageUrl || category?.imageUrl || '';
-      return `<article class="product-admin-card"><div class="product-thumb">${imageUrl ? `<img src="${esc(preview(imageUrl))}" alt="">` : '⬡'}${!product.active ? '<b>INATIVO</b>' : ''}</div>` +
-        `<div class="product-admin-info"><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong>${product.freeShippingEnabled === true ? `<em class="admin-free-shipping"><img src="../../assets/images/icone-capacete-entrega-gratis.svg" alt=""> <b>${esc(product.freeShippingText || 'Entrega grátis')}</b></em>` : ''}<p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
-        `<footer><div class="product-order-actions" aria-label="Alterar ordem de ${esc(product.name)}"><button type="button" data-move-product="${esc(product.id)}" data-direction="-1" aria-label="Mover ${esc(product.name)} para cima" title="Mover para cima">↑</button><button type="button" data-move-product="${esc(product.id)}" data-direction="1" aria-label="Mover ${esc(product.name)} para baixo" title="Mover para baixo">↓</button></div><button type="button" class="edit-product" data-edit="${esc(product.id)}">✎ Editar produto</button><button type="button" class="delete-product" data-delete="${esc(product.id)}" aria-label="Excluir ${esc(product.name)}">🗑</button></footer></article>`;
+    const products = catalog.products || [];
+    const categories = catalog.categories || [];
+    const knownCategoryIds = new Set(categories.map(category => String(category.id)));
+    const hasUncategorized = products.some(product => !knownCategoryIds.has(String(product.categoryId)));
+    const sections = hasUncategorized
+      ? [...categories, { id: '__uncategorized__', name: 'Sem categoria', emoji: '•', active: false, imageUrl: '' }]
+      : categories;
+    const categorySelect = $('#product-category-filter');
+    categorySelect.innerHTML = '<option value="all">Todas as categorias</option>' + categories.map(category => {
+      const count = products.filter(product => String(product.categoryId) === String(category.id)).length;
+      return `<option value="${esc(category.id)}">${esc(category.name)} (${count})</option>`;
+    }).join('') + (hasUncategorized ? '<option value="__uncategorized__">Sem categoria</option>' : '');
+    if (![...categorySelect.options].some(option => option.value === productCategoryFilter)) productCategoryFilter = 'all';
+    categorySelect.value = productCategoryFilter;
+
+    const matchesStatus = product => productStatusFilter === 'all'
+      || (productStatusFilter === 'active' && product.active !== false)
+      || (productStatusFilter === 'inactive' && product.active === false)
+      || (productStatusFilter === 'featured' && product.featured === true);
+    const matchesSearch = product => !productQuery || normalizeText([
+      product.name, product.description, product.badge,
+      ...(product.addonGroups || []).flatMap(group => [group.name, ...(group.options || []).map(option => option.name)])
+    ].filter(Boolean).join(' ')).includes(productQuery);
+    const filtersActive = Boolean(productQuery) || productCategoryFilter !== 'all' || productStatusFilter !== 'all';
+    let visibleProductCount = 0;
+    const sectionMarkup = sections.map(category => {
+      if (productCategoryFilter !== 'all' && String(category.id) !== productCategoryFilter) return '';
+      const categoryProducts = products.filter(product => category.id === '__uncategorized__'
+        ? !knownCategoryIds.has(String(product.categoryId))
+        : String(product.categoryId) === String(category.id));
+      const visibleProducts = categoryProducts.filter(product => matchesStatus(product) && matchesSearch(product));
+      if (filtersActive && !visibleProducts.length) return '';
+      visibleProductCount += visibleProducts.length;
+      const collapsed = !filtersActive && collapsedProductCategories.has(String(category.id));
+      const categoryVisual = category.imageUrl
+        ? `<img src="${esc(preview(category.imageUrl))}" alt="">`
+        : `<span aria-hidden="true">${esc(category.emoji || '•')}</span>`;
+      const cards = visibleProducts.map(product => {
+        const groupCount = (product.addonGroups || []).length;
+        const image = product.imageUrl
+          ? `<img src="${esc(preview(product.imageUrl))}" alt="" loading="lazy" decoding="async">`
+          : '<span class="product-no-image">Sem imagem</span>';
+        return `<article class="product-admin-card">
+          <div class="product-thumb">${image}<div class="product-status-badges"><span class="${product.active === false ? 'inactive' : 'active'}">${product.active === false ? 'Inativo' : 'Ativo'}</span>${product.featured === true ? '<span class="featured">Destaque</span>' : ''}</div></div>
+          <div class="product-admin-info"><h3>${esc(product.name || 'Produto sem nome')}</h3><strong>${money(product.price)}</strong>${product.freeShippingEnabled === true ? `<em class="admin-free-shipping"><img src="../../assets/images/icone-capacete-entrega-gratis.svg" alt=""> <b>${esc(product.freeShippingText || 'Entrega grátis')}</b></em>` : ''}<p>${groupCount} ${groupCount === 1 ? 'grupo de opções' : 'grupos de opções'}</p></div>
+          <footer><div class="product-order-actions" aria-label="Alterar ordem de ${esc(product.name)}"><button type="button" data-move-product="${esc(product.id)}" data-direction="-1" aria-label="Mover ${esc(product.name)} para antes" title="Mover para antes">←</button><button type="button" data-move-product="${esc(product.id)}" data-direction="1" aria-label="Mover ${esc(product.name)} para depois" title="Mover para depois">→</button></div><button type="button" class="edit-product" data-edit="${esc(product.id)}">✎ Editar</button><button type="button" class="delete-product" data-delete="${esc(product.id)}" aria-label="Excluir ${esc(product.name)}">🗑</button></footer>
+        </article>`;
+      }).join('');
+      return `<section class="product-category-section${collapsed ? ' is-collapsed' : ''}" data-product-category="${esc(category.id)}">
+        <header class="product-category-head"><div class="product-category-visual">${categoryVisual}</div><div class="product-category-title"><span>Categoria</span><h3>${esc(category.name)}</h3><p>${categoryProducts.length} ${categoryProducts.length === 1 ? 'produto cadastrado' : 'produtos cadastrados'}${category.active === false && category.id !== '__uncategorized__' ? ' · categoria inativa' : ''}</p></div><div class="product-category-actions"><button type="button" class="new-category-product" data-new-product-category="${esc(category.id)}">+ Novo nesta categoria</button><button type="button" class="toggle-product-category" data-toggle-product-category="${esc(category.id)}" aria-expanded="${!collapsed}" aria-label="${collapsed ? 'Abrir' : 'Recolher'} categoria ${esc(category.name)}">${collapsed ? '⌄' : '⌃'}</button></div></header>
+        <div class="product-category-grid">${cards || '<div class="product-category-empty"><b>Nenhum produto nesta categoria</b><span>Adicione o primeiro produto para começar a montar esta seção.</span></div>'}</div>
+      </section>`;
     }).join('');
+    $('#product-count').textContent = `${products.length} ${products.length === 1 ? 'produto' : 'produtos'} em ${categories.length} ${categories.length === 1 ? 'categoria' : 'categorias'}${filtersActive ? ` · ${visibleProductCount} exibido${visibleProductCount === 1 ? '' : 's'}` : ''}`;
+    $('#admin-products').innerHTML = sectionMarkup || '<div class="empty-admin product-filter-empty"><b>Nenhum produto encontrado</b><span>Altere a busca ou os filtros para visualizar outros produtos.</span></div>';
+    $('#admin-products').querySelectorAll('.product-thumb img').forEach(image => {
+      image.addEventListener('error', () => {
+        image.replaceWith(Object.assign(document.createElement('span'), { className: 'product-no-image', textContent: 'Sem imagem' }));
+      }, { once: true });
+    });
     $('#admin-products').querySelectorAll('[data-move-product]').forEach(button => {
-      const index = catalog.products.findIndex(product => product.id === button.dataset.moveProduct);
+      const currentProduct = products.find(product => String(product.id) === button.dataset.moveProduct);
+      const categoryId = String(currentProduct?.categoryId || '');
+      const categoryIndexes = products.map((product, index) => String(product.categoryId || '') === categoryId ? index : -1).filter(index => index >= 0);
+      const currentIndex = products.findIndex(product => String(product.id) === button.dataset.moveProduct);
+      const categoryPosition = categoryIndexes.indexOf(currentIndex);
       const direction = Number(button.dataset.direction);
-      button.disabled = index < 0 || index + direction < 0 || index + direction >= catalog.products.length;
+      button.disabled = categoryPosition < 0 || categoryPosition + direction < 0 || categoryPosition + direction >= categoryIndexes.length;
       button.onclick = () => {
-        const current = catalog.products.findIndex(product => product.id === button.dataset.moveProduct);
-        const target = current + direction;
-        if (current < 0 || target < 0 || target >= catalog.products.length) return;
-        [catalog.products[current], catalog.products[target]] = [catalog.products[target], catalog.products[current]];
+        const latestIndex = catalog.products.findIndex(product => String(product.id) === button.dataset.moveProduct);
+        const latestProduct = catalog.products[latestIndex];
+        if (!latestProduct) return;
+        const latestCategoryId = String(latestProduct.categoryId || '');
+        const latestCategoryIndexes = catalog.products.map((product, index) => String(product.categoryId || '') === latestCategoryId ? index : -1).filter(index => index >= 0);
+        const latestPosition = latestCategoryIndexes.indexOf(latestIndex);
+        const targetPosition = latestPosition + direction;
+        if (latestPosition < 0 || targetPosition < 0 || targetPosition >= latestCategoryIndexes.length) return;
+        const targetIndex = latestCategoryIndexes[targetPosition];
+        [catalog.products[latestIndex], catalog.products[targetIndex]] = [catalog.products[targetIndex], catalog.products[latestIndex]];
         renderProducts();
-        editorDirty = true;
+        notice('Ordem atualizada dentro da categoria. Publique as alterações para salvar.');
       };
+    });
+    $('#admin-products').querySelectorAll('[data-toggle-product-category]').forEach(button => {
+      button.onclick = () => {
+        const categoryId = button.dataset.toggleProductCategory;
+        if (collapsedProductCategories.has(categoryId)) collapsedProductCategories.delete(categoryId);
+        else collapsedProductCategories.add(categoryId);
+        renderProducts();
+      };
+    });
+    $('#admin-products').querySelectorAll('[data-new-product-category]').forEach(button => {
+      button.onclick = () => openEditor(null, button.dataset.newProductCategory === '__uncategorized__' ? '' : button.dataset.newProductCategory);
     });
     $('#admin-products').querySelectorAll('[data-edit]').forEach(button => { button.onclick = () => openEditor(button.dataset.edit); });
     $('#admin-products').querySelectorAll('[data-delete]').forEach(button => {
@@ -1090,12 +1168,14 @@
         const category = catalog.categories.find(item => item.id === id);
         if (input.dataset.catEmoji) category.emoji = input.value;
         if (input.dataset.catName) category.name = input.value;
+        renderProducts();
       };
     });
     $('#category-editor').querySelectorAll('[data-cat-active]').forEach(input => {
       input.onchange = () => {
         const category = catalog.categories.find(item => item.id === input.dataset.catActive);
         category.active = input.checked;
+        renderProducts();
       };
     });
     $('#category-editor').querySelectorAll('[data-cat-upload]').forEach(input => {
@@ -1172,10 +1252,15 @@
     if (enabled && !$('#edit-free-shipping').value.trim()) $('#edit-free-shipping').value = 'Entrega grátis';
   }
 
-  function openEditor(id) {
+  function openEditor(id, preferredCategoryId = '') {
+    const defaultCategoryId = catalog.categories.some(category => String(category.id) === String(preferredCategoryId))
+      ? preferredCategoryId
+      : (productCategoryFilter !== 'all' && catalog.categories.some(category => String(category.id) === productCategoryFilter)
+        ? productCategoryFilter
+        : (catalog.categories.find(category => category.active !== false)?.id || catalog.categories[0]?.id || 'destaques'));
     editing = id
       ? structuredClone(catalog.products.find(product => product.id === id))
-      : { id: crypto.randomUUID(), name: '', description: '', categoryId: catalog.categories[0]?.id || 'destaques', price: 0, imageUrl: '', featured: false, active: true, badge: '', freeShippingEnabled: false, freeShippingText: 'Entrega grátis', addonGroups: [] };
+      : { id: crypto.randomUUID(), name: '', description: '', categoryId: defaultCategoryId, price: 0, imageUrl: '', featured: false, active: true, badge: '', freeShippingEnabled: false, freeShippingText: 'Entrega grátis', addonGroups: [] };
     editing.addonGroups = editing.addonGroups || [];
     $('#editor-title').textContent = editing.name || 'Novo produto';
     $('#edit-name').value = editing.name;
@@ -1226,7 +1311,7 @@
       group.priceMode = group.priceMode === 'final' ? 'final' : 'additive';
       const priceHelp = group.priceMode === 'final' ? 'Digite o preço total de cada tamanho.' : 'Digite somente o acréscimo sobre o preço base.';
       const priceLabel = group.priceMode === 'final' ? 'Preço final' : 'Acréscimo';
-      const options = group.options.length ? group.options.map(option => `<div class="option-row" data-option="${esc(option.id)}"><div class="option-thumb">${option.imageUrl ? `<img src="${esc(preview(option.imageUrl))}" alt="">` : '🥣'}</div><div class="option-fields"><label><span>Nome da opção</span><input value="${esc(option.name)}" data-option-name placeholder="Ex.: 500 ml ou Morango" required></label><label><span>URL da imagem</span><input value="${esc(option.imageUrl || '')}" data-option-image placeholder="https://..."></label></div><label class="option-upload">Trocar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-option-upload></label><label class="option-price-field"><span>${priceLabel}</span><input class="option-price ${group.priceMode === 'final' ? 'final-price' : ''}" aria-label="${priceLabel}" type="number" inputmode="decimal" step=".01" min="0" value="${Number(option.price || 0)}" data-option-price required></label><label class="option-available"><input type="checkbox" data-option-available ${option.available === false ? '' : 'checked'}> Disponível</label><button type="button" class="remove-option" data-remove-option aria-label="Excluir opção">🗑 Excluir</button></div>`).join('') : '<p class="options-empty">Nenhuma opção cadastrada neste grupo.</p>';
+      const options = group.options.length ? group.options.map(option => `<div class="option-row" data-option="${esc(option.id)}"><div class="option-thumb${option.imageUrl ? '' : ' no-image'}">${option.imageUrl ? `<img src="${esc(preview(option.imageUrl))}" alt="">` : ''}</div><div class="option-fields"><label><span>Nome da opção</span><input value="${esc(option.name)}" data-option-name placeholder="Ex.: 500 ml ou Morango" required></label><label><span>URL da imagem</span><input value="${esc(option.imageUrl || '')}" data-option-image placeholder="https://..."></label></div><label class="option-upload">Trocar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-option-upload></label><label class="option-price-field"><span>${priceLabel}</span><input class="option-price ${group.priceMode === 'final' ? 'final-price' : ''}" aria-label="${priceLabel}" type="number" inputmode="decimal" step=".01" min="0" value="${Number(option.price || 0)}" data-option-price required></label><label class="option-available"><input type="checkbox" data-option-available ${option.available === false ? '' : 'checked'}> Disponível</label><button type="button" class="remove-option" data-remove-option aria-label="Excluir opção">🗑 Excluir</button></div>`).join('') : '<p class="options-empty">Nenhuma opção cadastrada neste grupo.</p>';
       return `<article class="addon-group-card" data-group="${esc(group.id)}"><header><label class="group-name"><span>Nome do grupo</span><input value="${esc(group.name)}" data-group-name placeholder="Ex.: Escolha o tamanho" required></label><label class="group-required"><input type="checkbox" data-group-required ${group.required ? 'checked' : ''}> Escolha obrigatória</label><label class="group-max"><span>Máximo</span><input type="number" inputmode="numeric" min="1" max="99" value="${group.max || 1}" data-group-max></label><label class="group-price-mode"><span>Tipo de preço</span><select data-group-price-mode><option value="additive" ${group.priceMode === 'additive' ? 'selected' : ''}>Acréscimo (+)</option><option value="final" ${group.priceMode === 'final' ? 'selected' : ''}>Preço final por tamanho</option></select></label><button type="button" class="remove-group" data-remove-group>🗑 Excluir grupo</button></header><small class="group-price-help">${priceHelp}</small>` +
         `<div class="options">${options}<button type="button" class="add-option" data-add-option>+ Adicionar opção</button></div></article>`;
     }).join('');
@@ -1312,7 +1397,7 @@
       renderPreviews();
       if (target === 'logo' || target === 'banner' || target === 'favicon' || target === 'category' || target === 'infoIcon' || target === 'offer') {
         await SupabaseStore.saveCatalog(catalog);
-        if (target === 'category') renderCategories();
+        if (target === 'category') { renderCategories(); renderProducts(); }
         notice('Imagem armazenada e publicada no cardápio.');
       } else {
         notice('Imagem armazenada. Confirme o produto para publicar.');
@@ -1464,7 +1549,19 @@
       $('#order-board-view').classList.remove('active');
       renderOrders();
     };
-    $('#new-product').onclick = () => openEditor();
+    $('#product-search').oninput = event => {
+      productQuery = normalizeText(event.target.value);
+      renderProducts();
+    };
+    $('#product-category-filter').onchange = event => {
+      productCategoryFilter = event.target.value;
+      renderProducts();
+    };
+    $('#product-status-filter').onchange = event => {
+      productStatusFilter = event.target.value;
+      renderProducts();
+    };
+    $('#new-product').onclick = () => openEditor(null, productCategoryFilter === 'all' ? '' : productCategoryFilter);
     $$('[data-close-product]').forEach(button => { button.onclick = () => closeEditor(false); });
     $('#product-form').addEventListener('input', event => {
       if (!editing) return;
@@ -1561,6 +1658,7 @@
     $('#add-category').onclick = () => {
       catalog.categories.push({ id: crypto.randomUUID(), name: 'Nova categoria', emoji: '🥣', imageUrl: '', active: true });
       renderCategories();
+      renderProducts();
     };
     $$('[data-upload]').forEach(input => { input.onchange = () => upload(input, input.dataset.upload); });
     $('#logo-url').oninput = event => { catalog.settings.logoUrl = event.target.value; renderPreviews(); };

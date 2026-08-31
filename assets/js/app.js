@@ -296,7 +296,16 @@
     root.querySelectorAll('img').forEach(image => {
       image.addEventListener('error', () => {
         image.hidden = true;
-        if (image.nextElementSibling) image.nextElementSibling.hidden = false;
+        if (image.nextElementSibling) {
+          image.nextElementSibling.hidden = false;
+          return;
+        }
+        const media = image.closest('.addon-option-media');
+        const option = media?.closest('.addon-option');
+        if (media && option) {
+          media.remove();
+          option.classList.add('no-media');
+        }
       }, { once: true });
     });
   }
@@ -368,20 +377,14 @@
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   }
 
-  function optionEmoji(option, group) {
-    const value = normalizeOptionName(`${option.name} ${group.name}`);
-    const visuals = [
-      [/banana/, '🍌'], [/morango/, '🍓'], [/kiwi/, '🥝'], [/manga/, '🥭'], [/uva/, '🍇'],
-      [/granola/, '🥣'], [/leite em po/, '🥛'], [/pacoca/, '🥜'], [/avela/, '🍫'], [/condensado/, '🥛'],
-      [/bacon/, '🥓'], [/queijo/, '🧀'], [/ovo/, '🥚'], [/refrigerante|coca|fanta/, '🥤'],
-      [/300|500|700|tamanho|media|grande/, '🥤']
-    ];
-    return visuals.find(([pattern]) => pattern.test(value))?.[1] || '✨';
+  function isSizeGroup(group) {
+    return /tamanho|copo|volume|\bml\b/.test(normalizeOptionName(group?.name));
   }
 
-  function optionMedia(option, group) {
-    if (option.imageUrl) return imageMarkup(option.imageUrl, option.name, optionEmoji(option, group), false);
-    return '<em aria-hidden="true">' + optionEmoji(option, group) + '</em>';
+  function optionMedia(option) {
+    const imageUrl = String(option.imageUrl || '').trim();
+    if (!imageUrl) return '';
+    return '<img src="' + escape(imageUrl) + '" alt="' + escape(option.name) + '" decoding="async" loading="lazy">';
   }
 
   function validateGroup(group) {
@@ -412,19 +415,21 @@
 
     if (groups.length) {
       addonList.innerHTML = groups.map(group => {
-      const maximum = Number(group.max || 1);
-      const minimum = Number(group.min || 0);
-      return '<fieldset data-group="' + escape(group.id) + '"><legend><span><b>' + escape(group.name) + '</b><small>' +
-        (minimum ? 'Escolha pelo menos ' + minimum : 'Opcional') + ' · até ' + maximum +
-        '</small></span>' + (minimum ? '<em>OBRIGATÓRIO</em>' : '') + '</legend><div class="addon-options">' +
-        group.options.map(option => {
-          const checked = (selections[group.id] || []).some(item => item.id === option.id);
-          return '<label class="addon-option' + (checked ? ' selected' : '') + '"><input type="' + (maximum === 1 ? 'radio' : 'checkbox') +
-            '" name="group-' + escape(group.id) + '" value="' + escape(option.id) + '"' + (checked ? ' checked' : '') +
-            '><span class="addon-option-media">' + optionMedia(option, group) + '</span><span class="addon-option-copy"><b>' +
-            escape(option.name) + '</b><small>' + (group.priceMode === 'final' ? MenuAPI.money(option.price) : (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso')) +
-            '</small></span><i aria-hidden="true">＋</i></label>';
-        }).join('') + '</div></fieldset>';
+        const maximum = Number(group.max || 1);
+        const minimum = Number(group.min || 0);
+        const hideMedia = isSizeGroup(group);
+        return '<fieldset data-group="' + escape(group.id) + '"><legend><span><b>' + escape(group.name) + '</b><small>' +
+          (minimum ? 'Escolha pelo menos ' + minimum : 'Opcional') + ' · até ' + maximum +
+          '</small></span>' + (minimum ? '<em>OBRIGATÓRIO</em>' : '') + '</legend><div class="addon-options">' +
+          group.options.map(option => {
+            const checked = (selections[group.id] || []).some(item => item.id === option.id);
+            const media = hideMedia ? '' : optionMedia(option);
+            return '<label class="addon-option' + (!media ? ' no-media' : '') + (checked ? ' selected' : '') + '"><input type="' + (maximum === 1 ? 'radio' : 'checkbox') +
+              '" name="group-' + escape(group.id) + '" value="' + escape(option.id) + '"' + (checked ? ' checked' : '') +
+              '>' + (media ? '<span class="addon-option-media">' + media + '</span>' : '') + '<span class="addon-option-copy"><b>' +
+              escape(option.name) + '</b><small>' + (group.priceMode === 'final' ? MenuAPI.money(option.price) : (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso')) +
+              '</small></span><i aria-hidden="true"></i></label>';
+          }).join('') + '</div></fieldset>';
       }).join('');
       bindImageFallbacks(addonList);
     } else {
@@ -581,11 +586,12 @@
         const imageUrl = item.imageUrl || product.imageUrl || category.imageUrl || '';
         return '<article class="cart-line"><div class="cart-product-image">' + imageMarkup(imageUrl, item.name, category.emoji || '🥣') + '</div><div class="cart-product-info">' +
           '<header><div><b>' + escape(item.name) + '</b><strong>' + MenuAPI.money(item.unitTotal * item.quantity) +
-          '</strong></div><button type="button" data-remove="' + escape(item.cartId) + '" aria-label="Remover produto">🗑</button></header>' +
+          '</strong></div></header>' +
           (item.selections || []).map(selection => '<p>' + escape(selection.groupName) + ': ' + selection.options.map(option => escape(option.name)).join(', ') + '</p>').join('') +
           (item.notes ? '<p>Obs: ' + escape(item.notes) + '</p>' : '') +
-          '<div class="quantity small"><button type="button" data-minus="' + escape(item.cartId) + '" aria-label="Diminuir quantidade">−</button><b>' + item.quantity +
-          '</b><button type="button" data-plus="' + escape(item.cartId) + '" aria-label="Aumentar quantidade">+</button></div></div></article>';
+          '<div class="cart-item-actions"><div class="quantity small"><button type="button" data-minus="' + escape(item.cartId) + '" aria-label="Diminuir quantidade">−</button><b>' + item.quantity +
+          '</b><button type="button" data-plus="' + escape(item.cartId) + '" aria-label="Aumentar quantidade">+</button></div><button class="cart-remove" type="button" data-remove="' +
+          escape(item.cartId) + '" aria-label="Remover produto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div></div></article>';
       }).join('') + '</div>' + renderCartSuggestions(suggestions) :
       '<div class="empty"><span>🛍</span><h3>Seu carrinho está vazio</h3><p>Escolha seus favoritos no cardápio.</p></div>';
     bindImageFallbacks($('#cart-items'));
