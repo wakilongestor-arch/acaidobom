@@ -48,7 +48,7 @@
 
   async function loadPrivateSettings() {
     const db = getClient();
-    if (!db) return { makeWebhookEnabled: false, makeWebhookUrl: '', available: false };
+    if (!db) return { makeWebhookEnabled: false, makeWebhookUrl: '', driverDeliveryEnabled: false, driverName: '', driverWhatsapp: '', available: false };
     const { data, error } = await db
       .from('private_settings')
       .select('data')
@@ -56,7 +56,7 @@
       .maybeSingle();
     if (error) {
       if (error.code === '42P01' || /private_settings|schema cache/i.test(error.message || '')) {
-        return { makeWebhookEnabled: false, makeWebhookUrl: '', available: false };
+        return { makeWebhookEnabled: false, makeWebhookUrl: '', driverDeliveryEnabled: false, driverName: '', driverWhatsapp: '', available: false };
       }
       throwIfError(error, 'Não foi possível carregar as integrações privadas.');
     }
@@ -68,6 +68,12 @@
     if (!db) throw new Error('Configure o Supabase antes de salvar integrações.');
     const makeWebhookEnabled = Boolean(settings.makeWebhookEnabled);
     const makeWebhookUrl = String(settings.makeWebhookUrl || '').trim();
+    const driverDeliveryEnabled = Boolean(settings.driverDeliveryEnabled);
+    const driverName = String(settings.driverName || '').trim();
+    const driverWhatsapp = String(settings.driverWhatsapp || '').replace(/\D/g, '');
+    if (driverDeliveryEnabled && driverWhatsapp.length < 10) {
+      throw new Error('Informe um WhatsApp válido do motoboy antes de ativar o envio.');
+    }
     if (makeWebhookEnabled && !makeWebhookUrl) {
       throw new Error('Cole a URL do webhook do Make antes de ativar a automação.');
     }
@@ -83,7 +89,10 @@
       id: 'integrations',
       data: {
         makeWebhookEnabled,
-        makeWebhookUrl
+        makeWebhookUrl,
+        driverDeliveryEnabled,
+        driverName,
+        driverWhatsapp
       },
       updated_at: new Date().toISOString()
     };
