@@ -156,7 +156,7 @@
     set('primaryColor', '#620853');
     set('accentColor', '#fcd307');
     set('brandBrightColor', '#620853');
-    if (typeof settings.autoOpenWhatsApp !== 'boolean') set('autoOpenWhatsApp', true);
+    if (typeof settings.autoOpenWhatsApp !== 'boolean') set('autoOpenWhatsApp', false);
     if (typeof settings.orderRedirectEnabled !== 'boolean') set('orderRedirectEnabled', false);
     if (typeof settings.orderRedirectUrl !== 'string') set('orderRedirectUrl', '');
     if (!settings.crmNotifications || typeof settings.crmNotifications !== 'object') {
@@ -229,6 +229,7 @@
     Object.entries(fields).forEach(([selector, key]) => { $(selector).value = settings[key] ?? ''; });
     $('#blocked-postal-codes').value = (settings.blockedPostalCodes || []).join('\n');
     $('#whatsapp-cloud-enabled').checked = Boolean(settings.whatsappCloudEnabled);
+    $('#auto-open-whatsapp').checked = settings.autoOpenWhatsApp === true;
     $('#gateway-enabled').checked = Boolean(settings.gatewayEnabled);
     $('#order-redirect-enabled').checked = Boolean(settings.orderRedirectEnabled);
     $('#daily-offer-enabled').checked = Boolean(settings.dailyOffer.enabled);
@@ -286,6 +287,7 @@
     settings.accentColor = '#fcd307';
     settings.brandBrightColor = '#620853';
     settings.whatsappCloudEnabled = $('#whatsapp-cloud-enabled').checked;
+    settings.autoOpenWhatsApp = $('#auto-open-whatsapp').checked;
     settings.gatewayEnabled = $('#gateway-enabled').checked;
     settings.orderRedirectEnabled = $('#order-redirect-enabled').checked;
     settings.dailyOffer = {
