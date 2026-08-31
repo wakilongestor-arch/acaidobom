@@ -13,6 +13,7 @@
   let deletingOrderIds = [];
   let orderRefreshTimer = null;
   let knownOrderIds = new Set();
+  const expandedOrderIds = new Set();
   let orderView = 'board';
   let orderPeriod = 'today';
   let customOrderDate = '';
@@ -696,7 +697,7 @@
       });
       if (item.notes) lines.push(`   Observação: ${item.notes}`);
     });
-    lines.push('', `Subtotal: ${money(order.subtotal)}`, `Entrega: ${money(order.delivery_fee)}`, `TOTAL: ${money(order.total)}`, '', `Pagamento: ${paymentLabel(order.payment_method)}`);
+    lines.push('', `Subtotal: ${money(order.subtotal)}`, `Entrega: ${money(order.delivery_fee)}`, `TOTAL: ${money(order.total)}`, '', `Pagamento: ${paymentLabel(order.payment_method)}`, `Status do pagamento: ${order.payment_status === 'pago' ? 'PAGO — não cobrar na entrega' : order.payment_status === 'estornado' ? 'ESTORNADO' : 'PENDENTE'}`);
     if (order.fulfillment === 'delivery') {
       lines.push('', 'ENDEREÇO DE ENTREGA', `${address.street || ''}, ${address.number || ''}${address.complement ? ` — ${address.complement}` : ''}`, `${address.neighborhood || ''} — ${address.city || ''}${address.zip ? ` — CEP ${address.zip}` : ''}`);
       if (address.deliveryRegion) lines.push(`Região de entrega: ${address.deliveryRegion}`);
@@ -707,6 +708,33 @@
     }
     if (order.notes) lines.push('', `OBSERVAÇÕES: ${order.notes}`);
     return lines.join('\n');
+  }
+
+  function receiptDocument(order) {
+    const note = esc(buildOrderNote(order));
+    return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc(order.order_number) + '</title><style>@page{margin:5mm}body{margin:0;color:#111;background:#fff;font:14px/1.45 "Courier New",monospace}.receipt{width:72mm;max-width:100%;margin:0 auto;padding:4mm;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere}.paid{margin:0 0 10px;padding:7px;border:2px solid #111;text-align:center;font-weight:900;font-size:18px}@media print{.receipt{padding:0}}</style></head><body><main class="receipt">' + (order.payment_status === 'pago' ? '<div class="paid">PAGAMENTO CONFIRMADO</div>' : '') + note + '</main></body></html>';
+  }
+
+  function printOrderReceipt(order) {
+    const popup = window.open('', '_blank', 'width=480,height=720');
+    if (!popup) return notice('Permita a abertura de janelas para imprimir a nota.', true);
+    popup.document.open();
+    popup.document.write(receiptDocument(order));
+    popup.document.close();
+    popup.focus();
+    popup.addEventListener('load', () => setTimeout(() => popup.print(), 120), { once: true });
+  }
+
+  function downloadOrderReceipt(order) {
+    const blob = new Blob([receiptDocument(order)], { type: 'text/html;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `nota-${String(order.order_number || order.id).replace(/[^a-z0-9-]/gi, '-')}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    notice('Nota baixada. Ela pode ser aberta e impressa em qualquer computador.');
   }
 
   function driverMapUrl(order) {
@@ -831,13 +859,14 @@
         ? `<button type="button" class="undo-paid" data-fast-payment="pendente" data-order-id="${esc(order.id)}">Desfazer pagamento</button>`
         : `<button type="button" class="mark-paid" data-fast-payment="pago" data-order-id="${esc(order.id)}">R$ Marcar como pago</button>`;
       const driverButton = driverDeliveryButton(order);
-      return `<article class="order-ticket status-${esc(order.status)}" data-order-card="${esc(order.id)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
+      const isExpanded = expandedOrderIds.has(String(order.id));
+      return `<article class="order-ticket status-${esc(order.status)}${isExpanded ? ' expanded' : ''}" data-order-card="${esc(order.id)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
         `<div class="customer"><span><small>CLIENTE</small><b>${esc(customer.name)}</b></span><span><small>WHATSAPP</small>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '-'}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span>${customer.email ? `<span><small>E-MAIL</small>${esc(customer.email)}</span>` : ''}</div>` +
         `<h4 class="order-section-title">ITENS DO PEDIDO</h4><div class="order-items">${itemsHtml}</div>${addressHtml}` +
         `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span>${deliveryPaymentNotice}<span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span><span class="email-status ${emailClass(storeEmailStatus)}">${esc(storeEmailText)}</span>${customer.email ? `<span class="email-status ${customerEmailEnabled ? emailClass(customerEmailStatus) : 'disabled'}">${esc(customerEmailDisplay)}</span>` : ''}</div>` +
         (order.notes ? `<div class="order-notes"><b>Observações gerais:</b> ${esc(order.notes)}</div>` : '') +
         `<div class="order-totals"><div><span>Subtotal</span><b>${money(order.subtotal)}</b></div><div><span>Taxa de entrega</span><b>${money(order.delivery_fee)}</b></div><div class="grand-total"><span>TOTAL</span><b>${money(order.total)}</b></div></div>` +
-        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">Ver nota completa</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${driverButton}${nextButton}${paymentButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
+        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">${isExpanded ? 'Recolher nota' : 'Ver nota completa'}</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button><button type="button" data-print-order="${esc(order.id)}">🖨 Imprimir</button><button type="button" data-download-order="${esc(order.id)}">↓ Baixar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${driverButton}${nextButton}${paymentButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
         `<div class="order-selects"><select aria-label="Status do pedido" data-order-status="${esc(order.id)}">${['novo', 'confirmado', 'preparando', 'saiu_entrega', 'concluido', 'cancelado'].map(value => `<option ${order.status === value ? 'selected' : ''} value="${value}">${statusLabel(value)}</option>`).join('')}</select>` +
         `<select aria-label="Status do pagamento" data-payment-status="${esc(order.id)}"><option ${order.payment_status === 'pendente' ? 'selected' : ''} value="pendente">Pagamento pendente</option><option ${order.payment_status === 'pago' ? 'selected' : ''} value="pago">Pagamento pago</option><option ${order.payment_status === 'estornado' ? 'selected' : ''} value="estornado">Pagamento estornado</option></select></div></footer></article>`;
     }).join('');
@@ -857,6 +886,18 @@
     box.querySelectorAll('[data-email-event]').forEach(button => {
       button.addEventListener('click', () => resendOrderEmail(button.dataset.orderId, button.dataset.emailEvent));
     });
+    box.querySelectorAll('[data-print-order]').forEach(button => {
+      button.addEventListener('click', () => {
+        const order = orders.find(item => String(item.id) === String(button.dataset.printOrder));
+        if (order) printOrderReceipt(order);
+      });
+    });
+    box.querySelectorAll('[data-download-order]').forEach(button => {
+      button.addEventListener('click', () => {
+        const order = orders.find(item => String(item.id) === String(button.dataset.downloadOrder));
+        if (order) downloadOrderReceipt(order);
+      });
+    });
     box.querySelectorAll('[data-copy-order]').forEach(button => {
       button.addEventListener('click', async () => {
         const order = orders.find(item => String(item.id) === String(button.dataset.copyOrder));
@@ -873,6 +914,8 @@
       button.addEventListener('click', () => {
         const card = button.closest('[data-order-card]');
         const expanded = card.classList.toggle('expanded');
+        if (expanded) expandedOrderIds.add(String(button.dataset.toggleOrder));
+        else expandedOrderIds.delete(String(button.dataset.toggleOrder));
         button.textContent = expanded ? 'Recolher nota' : 'Ver nota completa';
       });
     });
