@@ -710,6 +710,57 @@
     return lines.join('\n');
   }
 
+  function driverMapUrl(order) {
+    const address = order.address || {};
+    if (/^https:\/\/www\.google\.com\/maps\//.test(address.mapUrl || '')) return address.mapUrl;
+    const query = [address.street, address.number, address.neighborhood, address.city, address.zip].filter(Boolean).join(', ');
+    return query ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query) : '';
+  }
+
+  function buildDriverMessage(order) {
+    const customer = order.customer || {};
+    const address = order.address || {};
+    const itemSummary = (order.items || []).map(item => Number(item.quantity || 1) + 'x ' + item.name).join(', ');
+    const lines = [
+      '🛵 *NOVA ENTREGA — AÇAÍ DO BOM*',
+      'Pedido: *' + (order.order_number || '-') + '*',
+      'Cliente: *' + (customer.name || '-') + '*',
+      itemSummary ? 'Pedido: ' + itemSummary : '',
+      '',
+      '📍 *ENDEREÇO*',
+      [address.street, address.number].filter(Boolean).join(', '),
+      [address.neighborhood, address.city].filter(Boolean).join(' — ')
+    ].filter(line => line !== '');
+    if (address.complement) lines.push('Complemento: ' + address.complement);
+    if (address.reference) lines.push('Referência: ' + address.reference);
+    const mapUrl = driverMapUrl(order);
+    if (mapUrl) lines.push('🗺️ Abrir rota: ' + mapUrl);
+    lines.push('', '💰 *PAGAMENTO*');
+    if (order.payment_status === 'pago') {
+      lines.push('✓ Pagamento já confirmado — não cobrar na entrega.');
+    } else {
+      lines.push('Receber na entrega: *' + money(order.total) + '*');
+      lines.push('Forma: *' + paymentLabel(order.payment_method) + '*');
+      if (order.payment_method === 'card') lines.push('⚠️ Levar máquina de cartão.');
+      if (order.payment_method === 'cash') {
+        const changeFor = Number(String(order.change_for || '').replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
+        if (changeFor > 0) lines.push('⚠️ Troco para: *' + money(changeFor) + '* — levar ' + money(Math.max(0, changeFor - Number(order.total || 0))) + ' de troco.');
+        else lines.push('⚠️ Confirmar necessidade de troco.');
+      }
+    }
+    if (privateSettings.driverName) lines.push('', 'Entrega destinada a: ' + privateSettings.driverName);
+    return lines.join('\n');
+  }
+
+  function driverDeliveryButton(order) {
+    if (!privateSettings.driverDeliveryEnabled || order.fulfillment !== 'delivery') return '';
+    let phone = String(privateSettings.driverWhatsapp || '').replace(/\D/g, '');
+    if (phone.length < 10) return '';
+    if (!phone.startsWith('55')) phone = '55' + phone;
+    const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(buildDriverMessage(order));
+    return '<a class="send-driver" href="' + esc(url) + '" target="_blank" rel="noopener">🛵 Enviar ao motoboy</a>';
+  }
+
   function nextOrderAction(order) {
     if (order.status === 'novo') return { status: 'confirmado', label: '✓ Confirmar pedido' };
     if (order.status === 'confirmado') return { status: 'preparando', label: '▶ Iniciar preparo' };
@@ -770,13 +821,14 @@
       const paymentButton = order.payment_status === 'pago'
         ? `<button type="button" class="undo-paid" data-fast-payment="pendente" data-order-id="${esc(order.id)}">Desfazer pagamento</button>`
         : `<button type="button" class="mark-paid" data-fast-payment="pago" data-order-id="${esc(order.id)}">R$ Marcar como pago</button>`;
+      const driverButton = driverDeliveryButton(order);
       return `<article class="order-ticket status-${esc(order.status)}" data-order-card="${esc(order.id)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
         `<div class="customer"><span><small>CLIENTE</small><b>${esc(customer.name)}</b></span><span><small>WHATSAPP</small>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '-'}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span>${customer.email ? `<span><small>E-MAIL</small>${esc(customer.email)}</span>` : ''}</div>` +
         `<h4 class="order-section-title">ITENS DO PEDIDO</h4><div class="order-items">${itemsHtml}</div>${addressHtml}` +
         `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span><span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span><span class="email-status ${emailClass(storeEmailStatus)}">${esc(storeEmailText)}</span>${customer.email ? `<span class="email-status ${customerEmailEnabled ? emailClass(customerEmailStatus) : 'disabled'}">${esc(customerEmailDisplay)}</span>` : ''}</div>` +
         (order.notes ? `<div class="order-notes"><b>Observações gerais:</b> ${esc(order.notes)}</div>` : '') +
         `<div class="order-totals"><div><span>Subtotal</span><b>${money(order.subtotal)}</b></div><div><span>Taxa de entrega</span><b>${money(order.delivery_fee)}</b></div><div class="grand-total"><span>TOTAL</span><b>${money(order.total)}</b></div></div>` +
-        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">Ver nota completa</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${nextButton}${paymentButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
+        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">Ver nota completa</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${driverButton}${nextButton}${paymentButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
         `<div class="order-selects"><select aria-label="Status do pedido" data-order-status="${esc(order.id)}">${['novo', 'confirmado', 'preparando', 'saiu_entrega', 'concluido', 'cancelado'].map(value => `<option ${order.status === value ? 'selected' : ''} value="${value}">${statusLabel(value)}</option>`).join('')}</select>` +
         `<select aria-label="Status do pagamento" data-payment-status="${esc(order.id)}"><option ${order.payment_status === 'pendente' ? 'selected' : ''} value="pendente">Pagamento pendente</option><option ${order.payment_status === 'pago' ? 'selected' : ''} value="pago">Pagamento pago</option><option ${order.payment_status === 'estornado' ? 'selected' : ''} value="estornado">Pagamento estornado</option></select></div></footer></article>`;
     }).join('');
@@ -1316,6 +1368,8 @@
         if (button.dataset.tab === 'customers') { document.title = 'Clientes | Açaí do Bom'; refreshOrders(false); }
       };
     });
+    setupSettingsAccordions();
+    $('#driver-delivery-enabled').onchange = updateDriverSettingsVisibility;
     $('#save-all').onclick = saveAll;
     $('#refresh-orders').onclick = () => refreshOrders(true);
     $('#customer-search').oninput = event => { customerQuery = event.target.value.trim(); renderCustomers(); };
