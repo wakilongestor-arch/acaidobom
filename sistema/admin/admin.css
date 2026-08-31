@@ -174,3 +174,47 @@ body.dialog-open{overflow:hidden}
 }
 
 @media(max-width:380px){.stats{grid-template-columns:1fr}.editor-progress span{gap:4px;font-size:7px}.editor-progress b{width:19px;height:19px}.switches{grid-template-columns:1fr}.dialog form>footer{grid-template-columns:1fr}.dialog form>footer button{width:100%}}
+
+
+/* Controles simples para definir a ordem pública dos produtos. */
+.product-list .product-admin-card>footer{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:8px;
+}
+.product-order-actions{
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.product-list footer .product-order-actions button{
+  width:38px;
+  height:38px;
+  padding:0;
+  border:1px solid #d9c8dd;
+  border-radius:9px;
+  background:#f7f1f8;
+  color:var(--brand);
+  font-size:19px;
+  font-weight:900;
+  cursor:pointer;
+}
+.product-list footer .product-order-actions button:hover:not(:disabled){
+  border-color:var(--brand);
+  background:var(--brand);
+  color:#fff;
+}
+.product-list footer .product-order-actions button:disabled{
+  opacity:.32;
+  cursor:not-allowed;
+}
+@media(max-width:700px){
+  .product-list .product-admin-card>footer{
+    grid-template-columns:auto minmax(0,1fr) auto;
+  }
+  .product-list footer .product-order-actions button{
+    width:36px;
+    height:40px;
+  }
+}
