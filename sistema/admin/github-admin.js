@@ -824,20 +824,25 @@
         return `<div class="order-item"><b>${Number(item.quantity || 1)}x ${esc(item.name)}</b><strong>${money(Number(item.unitTotal || 0) * Number(item.quantity || 1))}</strong>${additions}${item.notes ? `<small><b>Observação:</b> ${esc(item.notes)}</small>` : ''}</div>`;
       }).join('');
       const mapUrl = /^https:\/\/www\.google\.com\/maps\//.test(address.mapUrl || '') ? address.mapUrl : '';
-      const addressHtml = order.fulfillment === 'delivery'
-        ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.deliveryRegion ? `<br><b>Região de entrega:</b> ${esc(address.deliveryRegion)}` : ''}${address.reference ? `<br><b>Referência:</b> ${esc(address.reference)}` : ''}${mapUrl ? `<br><a class="map-link" href="${esc(mapUrl)}" target="_blank" rel="noopener">Abrir localização no mapa</a>` : ''}</div>`
-        : '<div class="order-address"><b>🏪 Retirada no local</b><br>Cliente buscará o pedido na loja.</div>';
+      const driverButton = driverDeliveryButton(order);
       const paymentClass = order.payment_status === 'pago' ? 'paid' : order.payment_status === 'estornado' ? 'refunded' : 'pending';
       const rawChangeFor = Number(String(order.change_for || '').replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
+      const paymentMethodText = order.payment_provider === 'mercadopago' || order.payment_method === 'payment_link'
+        ? 'Mercado Pago'
+        : paymentLabel(order.payment_method);
       const deliveryPaymentNotice = order.payment_status === 'pago'
-        ? '<span class="receipt-payment-note paid">Não cobrar na entrega</span>'
-        : order.payment_method === 'card'
-          ? '<span class="receipt-payment-note card">Levar máquina de cartão</span>'
+        ? '<span class="receipt-payment-note paid">✓ Pago pelo Mercado Pago · não cobrar</span>'
+        : order.payment_method === 'card_delivery'
+          ? '<span class="receipt-payment-note card">Pendente · levar máquina de cartão</span>'
           : order.payment_method === 'cash' && rawChangeFor > 0
-            ? '<span class="receipt-payment-note cash">Troco para ' + esc(money(rawChangeFor)) + ' · levar ' + esc(money(Math.max(0, rawChangeFor - Number(order.total || 0)))) + '</span>'
+            ? '<span class="receipt-payment-note cash">Pendente · troco para ' + esc(money(rawChangeFor)) + ' · levar ' + esc(money(Math.max(0, rawChangeFor - Number(order.total || 0)))) + '</span>'
             : order.payment_method === 'cash'
-              ? '<span class="receipt-payment-note cash">Confirmar necessidade de troco</span>'
-              : '';
+              ? '<span class="receipt-payment-note cash">Pendente · confirmar necessidade de troco</span>'
+              : '<span class="receipt-payment-note pending">Pagamento on-line aguardando confirmação</span>';
+      const paymentDeliveryHtml = `<div class="delivery-payment"><b>💳 Pagamento na conclusão</b><span>Forma: ${esc(paymentMethodText)}</span><span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span>${deliveryPaymentNotice}</div>`;
+      const addressHtml = order.fulfillment === 'delivery'
+        ? `<div class="order-address"><b>📍 Endereço de entrega</b><br>${esc(address.street)}, ${esc(address.number)}${address.complement ? ` — ${esc(address.complement)}` : ''}<br>${esc(address.neighborhood)} — ${esc(address.city)}${address.zip ? ` — CEP ${esc(address.zip)}` : ''}${address.deliveryRegion ? `<br><b>Região de entrega:</b> ${esc(address.deliveryRegion)}` : ''}${address.reference ? `<br><b>Referência:</b> ${esc(address.reference)}` : ''}${mapUrl ? `<br><a class="map-link" href="${esc(mapUrl)}" target="_blank" rel="noopener">Abrir localização no mapa</a>` : ''}${driverButton ? `<div class="delivery-driver-action">${driverButton}</div>` : ''}</div>${paymentDeliveryHtml}`
+        : `<div class="order-address"><b>🏪 Retirada no local</b><br>Cliente buscará o pedido na loja.</div>${paymentDeliveryHtml}`;
       const nextAction = nextOrderAction(order);
       const storeEmailStatus = order.store_email_status || 'nao_enviado';
       const customerEmailStatus = order.customer_email_status || 'nao_enviado';
@@ -855,20 +860,16 @@
         : '';
       const nextButton = nextAction ? `<button type="button" class="next-order" data-fast-status="${esc(nextAction.status)}" data-order-id="${esc(order.id)}">${esc(nextAction.label)}</button>` : '';
       const cancelButton = !['concluido', 'cancelado'].includes(order.status) ? `<button type="button" class="cancel-order" data-fast-status="cancelado" data-order-id="${esc(order.id)}">Cancelar pedido</button>` : '';
-      const paymentButton = order.payment_status === 'pago'
-        ? `<button type="button" class="undo-paid" data-fast-payment="pendente" data-order-id="${esc(order.id)}">Desfazer pagamento</button>`
-        : `<button type="button" class="mark-paid" data-fast-payment="pago" data-order-id="${esc(order.id)}">R$ Marcar como pago</button>`;
-      const driverButton = driverDeliveryButton(order);
       const isExpanded = expandedOrderIds.has(String(order.id));
       return `<article class="order-ticket status-${esc(order.status)}${isExpanded ? ' expanded' : ''}" data-order-card="${esc(order.id)}"><header class="ticket-head"><div><div class="ticket-title"><b>${esc(order.order_number)}</b><span class="status-badge" data-status="${esc(order.status)}">${esc(statusLabel(order.status))}</span></div><small>${new Date(order.created_at).toLocaleString('pt-BR')}</small></div><strong>${money(order.total)}</strong></header>` +
         `<div class="customer"><span><small>CLIENTE</small><b>${esc(customer.name)}</b></span><span><small>WHATSAPP</small>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '-'}</span><span><small>RECEBIMENTO</small>${order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'}</span>${customer.email ? `<span><small>E-MAIL</small>${esc(customer.email)}</span>` : ''}</div>` +
         `<h4 class="order-section-title">ITENS DO PEDIDO</h4><div class="order-items">${itemsHtml}</div>${addressHtml}` +
-        `<div class="order-meta"><span>Pagamento: ${esc(paymentLabel(order.payment_method))}</span>${deliveryPaymentNotice}<span class="payment-badge ${paymentClass}">${order.payment_status === 'pago' ? 'Pagamento confirmado' : order.payment_status === 'estornado' ? 'Pagamento estornado' : 'Pagamento pendente'}</span><span class="email-status ${emailClass(storeEmailStatus)}">${esc(storeEmailText)}</span>${customer.email ? `<span class="email-status ${customerEmailEnabled ? emailClass(customerEmailStatus) : 'disabled'}">${esc(customerEmailDisplay)}</span>` : ''}</div>` +
+        `<div class="order-meta"><span class="email-status ${emailClass(storeEmailStatus)}">${esc(storeEmailText)}</span>${customer.email ? `<span class="email-status ${customerEmailEnabled ? emailClass(customerEmailStatus) : 'disabled'}">${esc(customerEmailDisplay)}</span>` : ''}</div>` +
         (order.notes ? `<div class="order-notes"><b>Observações gerais:</b> ${esc(order.notes)}</div>` : '') +
         `<div class="order-totals"><div><span>Subtotal</span><b>${money(order.subtotal)}</b></div><div><span>Taxa de entrega</span><b>${money(order.delivery_fee)}</b></div><div class="grand-total"><span>TOTAL</span><b>${money(order.total)}</b></div></div>` +
-        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">${isExpanded ? 'Recolher nota' : 'Ver nota completa'}</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button><button type="button" data-print-order="${esc(order.id)}">🖨 Imprimir</button><button type="button" data-download-order="${esc(order.id)}">↓ Baixar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${driverButton}${nextButton}${paymentButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
+        `<footer class="order-footer"><div class="order-actions"><button type="button" data-toggle-order="${esc(order.id)}">${isExpanded ? 'Recolher nota' : 'Ver nota completa'}</button><button type="button" data-copy-order="${esc(order.id)}">▣ Copiar nota</button><button type="button" data-print-order="${esc(order.id)}">🖨 Imprimir</button><button type="button" data-download-order="${esc(order.id)}">↓ Baixar nota</button>${phone ? `<a href="https://wa.me/${whatsappPhone}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${nextButton}${cancelButton}${retryStoreEmail}${retryCustomerEmail}<button type="button" class="delete-order" data-delete-order="${esc(order.id)}">🗑 Excluir pedido</button></div>` +
         `<div class="order-selects"><select aria-label="Status do pedido" data-order-status="${esc(order.id)}">${['novo', 'confirmado', 'preparando', 'saiu_entrega', 'concluido', 'cancelado'].map(value => `<option ${order.status === value ? 'selected' : ''} value="${value}">${statusLabel(value)}</option>`).join('')}</select>` +
-        `<select aria-label="Status do pagamento" data-payment-status="${esc(order.id)}"><option ${order.payment_status === 'pendente' ? 'selected' : ''} value="pendente">Pagamento pendente</option><option ${order.payment_status === 'pago' ? 'selected' : ''} value="pago">Pagamento pago</option><option ${order.payment_status === 'estornado' ? 'selected' : ''} value="estornado">Pagamento estornado</option></select></div></footer></article>`;
+        `</div></footer></article>`;
     }).join('');
     organizeOrdersView(box);
     box.querySelectorAll('select').forEach(select => {
@@ -876,9 +877,6 @@
     });
     box.querySelectorAll('[data-fast-status]').forEach(button => {
       button.addEventListener('click', () => updateOrder(button.dataset.orderId, { status: button.dataset.fastStatus }));
-    });
-    box.querySelectorAll('[data-fast-payment]').forEach(button => {
-      button.addEventListener('click', () => updateOrder(button.dataset.orderId, { paymentStatus: button.dataset.fastPayment }));
     });
     box.querySelectorAll('[data-delete-order]').forEach(button => {
       button.addEventListener('click', () => openOrderDelete(button.dataset.deleteOrder));
