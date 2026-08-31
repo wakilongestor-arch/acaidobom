@@ -367,12 +367,8 @@
     box.hidden = false;
     const title = result.stored ? 'PEDIDO REGISTRADO' : 'PEDIDO PRONTO';
     const message = result.stored
-      ? (result.notificationSent
-        ? 'Seu pedido foi enviado ao painel e ao WhatsApp da loja automaticamente.'
-        : result.notificationError
-          ? 'Seu pedido está seguro no painel. A automação do WhatsApp precisa ser revisada pela loja.'
-          : 'Seu pedido foi enviado automaticamente ao painel da loja.')
-      : 'Não foi possível registrar no painel. Envie agora a nota completa pelo WhatsApp.';
+      ? 'Sua solicitação de pedido foi recebida. Fique de olho no seu e-mail e aguarde a confirmação da loja antes de considerar o pedido aprovado.'
+      : 'Não foi possível registrar sua solicitação. Volte ao cardápio e tente novamente.';
     const emailNotice = result.stored && result.customerEmail
       ? (result.emailAutomationConfigured
         ? `<div class="email-confirmation">✉ A confirmação será enviada automaticamente para <b>${String(result.customerEmail).replace(/[&<>"']/g, '')}</b> quando a loja confirmar o pedido.</div>`
@@ -388,7 +384,7 @@
       (result.pixKey ? `<div class="pix"><span><small>CHAVE PIX</small><b>${result.pixKey}</b></span><button type="button" data-copy-pix>Copiar</button></div>` : '') +
       '<div class="success-links">' +
       (result.paymentUrl ? `<a href="${result.paymentUrl}" target="_blank" rel="noopener">Pagar on-line</a>` : '') +
-      (result.whatsappUrl ? `<a class="wa" href="${result.whatsappUrl}" target="_blank" rel="noopener">Abrir WhatsApp novamente</a>` : '') +
+      (catalog.settings.autoOpenWhatsApp === true && result.whatsappUrl ? `<a class="wa" href="${result.whatsappUrl}" target="_blank" rel="noopener">Enviar pedido pelo WhatsApp</a>` : '') +
       (redirectUrl ? `<a class="redirect-link" href="${redirectUrl}">Continuar →</a>` : '') +
       '</div><button type="button" class="link-button" data-finish>Voltar ao cardápio</button>';
     box.querySelector('[data-copy-pix]')?.addEventListener('click', () => navigator.clipboard.writeText(result.pixKey));
