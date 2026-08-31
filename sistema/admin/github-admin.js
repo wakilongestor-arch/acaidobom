@@ -30,11 +30,8 @@
     pasteis: 'assets/images/categories/pasteis.jpg'
   };
   const crmNotificationDefaults = {
-    confirmed: { label: 'Pedido confirmado', enabled: true, title: 'Pedido confirmado! 🎉', message: 'Olá, {primeiro_nome}! Seu pedido foi confirmado e já está sendo preparado com todo carinho. Assim que sair para entrega, avisaremos você por e-mail.', imageUrl: '' },
-    preparing: { label: 'Em preparo', enabled: true, title: 'Preparando seu pedido 💜', message: '{primeiro_nome}, seu pedido já está sendo preparado com muito carinho.', imageUrl: '' },
-    out_for_delivery: { label: 'Saiu para entrega', enabled: true, title: 'Seu pedido está a caminho! 🛵', message: '{primeiro_nome}, seu pedido saiu para entrega. Fique de olho!', imageUrl: '' },
-    completed: { label: 'Pedido concluído', enabled: true, title: 'Pedido concluído! 💛', message: '{primeiro_nome}, seu pedido foi concluído. Obrigado por escolher o Açaí do Bom!', imageUrl: '' },
-    cancelled: { label: 'Pedido cancelado', enabled: true, title: 'Pedido cancelado', message: '{primeiro_nome}, o pedido {pedido} foi cancelado. Fale conosco se precisar de ajuda.', imageUrl: '' }
+    confirmed: { label: 'Pedido confirmado e em preparo', enabled: true, title: 'Pedido confirmado! 🎉', message: 'Olá, {primeiro_nome}! Seu pedido {pedido} foi confirmado e já está sendo preparado com todo carinho.', imageUrl: '' },
+    out_for_delivery: { label: 'Saiu para entrega', enabled: true, title: 'Seu pedido está a caminho! 🛵', message: '{primeiro_nome}, seu pedido {pedido} saiu para entrega. Fique de olho!', imageUrl: '' }
   };
   const defaultHours = () => Object.fromEntries(weekDays.map(([key]) => [
     key, { enabled: true, open: '00:00', close: '23:59' }
@@ -807,7 +804,7 @@
       const emailClass = status => status === 'enviado' ? 'sent' : status === 'erro' ? 'error' : 'pending';
       const storeEmailText = storeEmailStatus === 'enviado' ? 'Loja: nota enviada' : storeEmailStatus === 'erro' ? 'Loja: erro no envio' : 'Loja: nota pendente';
       const customerEmailText = customerEmailStatus === 'enviado' ? 'Cliente: e-mail enviado' : customerEmailStatus === 'erro' ? 'Cliente: erro no envio' : 'Cliente: e-mail pendente';
-      const customerEmailEvent = ({ confirmado: 'confirmed', preparando: 'preparing', saiu_entrega: 'out_for_delivery', concluido: 'completed', cancelado: 'cancelled' })[order.status];
+      const customerEmailEvent = ({ confirmado: 'confirmed', saiu_entrega: 'out_for_delivery' })[order.status];
       const customerEmailEnabled = !customerEmailEvent || catalog.settings.crmNotifications?.[customerEmailEvent]?.enabled !== false;
       const customerEmailDisplay = customerEmailEvent && !customerEmailEnabled ? 'Cliente: aviso desta etapa desativado' : customerEmailText;
       const retryStoreEmail = storeEmailStatus !== 'enviado'
@@ -902,8 +899,7 @@
     if (changes.paymentStatus === 'pago' && order.status === 'novo' && !changes.status) status = 'confirmado';
     if (status === order.status && paymentStatus === order.payment_status) return;
     const statusEvents = {
-      confirmado: 'confirmed', preparando: 'preparing', saiu_entrega: 'out_for_delivery',
-      concluido: 'completed', cancelado: 'cancelled'
+      confirmado: 'confirmed', saiu_entrega: 'out_for_delivery'
     };
     const emailEvents = [];
     if (status !== order.status && statusEvents[status] && catalog.settings.crmNotifications?.[statusEvents[status]]?.enabled !== false) emailEvents.push(statusEvents[status]);
