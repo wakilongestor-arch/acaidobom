@@ -918,7 +918,7 @@
         if (current < 0 || target < 0 || target >= catalog.products.length) return;
         [catalog.products[current], catalog.products[target]] = [catalog.products[target], catalog.products[current]];
         renderProducts();
-        showToast('Ordem alterada. Clique em “Publicar alterações” para salvar.', 'success');
+        editorDirty = true;
       };
     });
     $('#admin-products').querySelectorAll('[data-edit]').forEach(button => { button.onclick = () => openEditor(button.dataset.edit); });
