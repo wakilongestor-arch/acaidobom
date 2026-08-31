@@ -35,7 +35,7 @@
   {"@context":"https://schema.org","@type":"Restaurant","name":"Açaí do Bom","url":"https://acaidobom.com.br/","logo":"https://acaidobom.com.br/assets/images/favicon/favicon-512.png","image":"https://acaidobom.com.br/assets/images/social/cardapio-acai-do-bom.jpg","telephone":"+556993817951","servesCuisine":["Açaí","Lanches","Pastéis"],"priceRange":"R$","address":{"@type":"PostalAddress","addressLocality":"Ji-Paraná","addressRegion":"RO","addressCountry":"BR"},"areaServed":{"@type":"City","name":"Ji-Paraná"},"hasMenu":"https://acaidobom.com.br/#cardapio"}
   </script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" href="assets/css/style.css?v=20260831-product-page">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260831-modal-layer-fix">
   <link rel="stylesheet" href="assets/css/theme-custom.css?v=20260831-product-presentation">
   <link rel="stylesheet" href="assets/css/consent.css?v=20260830-bannerfix">
 </head>
@@ -107,7 +107,7 @@
 
   <div class="overlay" id="product-overlay" hidden>
     <section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-name">
-      <button class="product-presentation-close" type="button" data-close-product aria-label="Fechar produto">Fechar</button>
+      <button class="modal-close product-presentation-close" data-close-product aria-label="Fechar produto">⌄</button>
       <div class="product-modal-head"><div class="product-presentation-media"><img id="product-image" alt=""><span class="product-modal-free-badge" id="product-modal-free-badge" hidden><img src="assets/images/icone-capacete-entrega-gratis.svg" alt=""> <b>Grátis</b></span></div><div class="product-presentation-copy"><h2 id="product-name"></h2><p id="product-description"></p><b id="product-base-price"></b></div></div>
       <header class="product-step-head"><div><small id="product-step-label">Etapa 1 de 1</small><b id="product-step-title">Escolha as opções</b></div></header>
       <div class="addon-list" id="addon-list" aria-live="polite"></div>
