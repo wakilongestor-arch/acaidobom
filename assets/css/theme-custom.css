@@ -411,3 +411,11 @@ button,a,label{touch-action:manipulation}
 @media(prefers-reduced-motion:reduce){
   .open-status,.open-status::before,.open-status.closed,.open-status.closed::before{animation:none}
 }
+
+/* Selo opcional de entrega grátis sem esconder o produto. */
+.free-shipping{display:inline-flex;align-items:center;gap:5px}
+.free-shipping svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.delivery-free-icon{position:absolute;z-index:3;top:7px;left:7px;width:31px;height:31px;border:2px solid #fff;border-radius:50%;background:#16a34a;color:#fff;display:grid;place-items:center;box-shadow:0 5px 13px rgba(22,163,74,.28)}
+.delivery-free-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.product-media>b{top:auto!important;bottom:7px!important;left:7px!important;right:auto;max-width:calc(100% - 14px)!important;padding:4px 7px!important;background:rgba(252,211,7,.94)!important;font-size:7px!important;line-height:1!important;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+@media(max-width:700px){.delivery-free-icon{width:27px;height:27px}.delivery-free-icon svg{width:17px;height:17px}.product-media>b{font-size:6px!important;padding:3px 6px!important}}
