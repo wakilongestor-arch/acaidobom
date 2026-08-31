@@ -348,11 +348,12 @@
       const imageUrl = product.imageUrl || category.imageUrl || '';
       const freeShipping = product.freeShippingEnabled === true ? String(product.freeShippingText || 'Entrega grátis').trim() : '';
       const helmetIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14a8 8 0 0 1 16 0v2H4z"/><path d="M3 16h18v3H3z"/><path d="M12 6v8"/></svg>';
+      const deliveryIcon = product.freeShippingIconUrl ? '<img src="' + escape(product.freeShippingIconUrl) + '" alt="" loading="lazy">' : helmetIcon;
       return '<article class="product-card"><button type="button" data-product="' + escape(product.id) + '">' +
         '<div class="product-copy"><small>' + escape(category.name || 'Açaí do Bom') + '</small><h3>' + escape(product.name) + '</h3><p>' + escape(product.description) + '</p>' +
         (freeShipping ? '<em class="free-shipping">' + helmetIcon + escape(freeShipping) + '</em>' : '') +
         '<footer><b class="product-price">' + ((product.addonGroups || []).some(group => group.priceMode === 'final') ? '<small>A partir de</small>' : '') + '<strong>' + MenuAPI.money(startingPrice(product)) + '</strong></b><span aria-hidden="true">＋</span></footer></div>' +
-        '<div class="product-media">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + (freeShipping ? '<span class="delivery-free-icon" title="Entrega grátis">' + helmetIcon + '</span>' : '') + (product.badge ? '<b>' + escape(product.badge) + '</b>' : '') + '</div>' +
+        '<div class="product-media">' + imageMarkup(imageUrl, product.name, category.emoji || '🥣') + (freeShipping ? '<span class="delivery-free-icon" title="Entrega grátis">' + deliveryIcon + '</span>' : '') + (product.badge ? '<b>' + escape(product.badge) + '</b>' : '') + '</div>' +
       '</button></article>';
     }).join('');
     bindImageFallbacks(container);
