@@ -357,3 +357,13 @@ button,a,label{touch-action:manipulation}
 @media(max-width:380px){
   .product-price strong{font-size:15px}
 }
+
+
+/* Fechado: mantém o formato e aumenta a visibilidade. */
+.open-status.closed{
+  border-color:#e84118;
+  background:#f05a24;
+  color:#fff;
+  box-shadow:0 7px 18px rgba(232,65,24,.28);
+}
+.open-status.closed::before{background:#fff;animation:none}
