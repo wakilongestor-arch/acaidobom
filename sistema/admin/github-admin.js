@@ -906,8 +906,21 @@
       const imageUrl = product.imageUrl || category?.imageUrl || '';
       return `<article class="product-admin-card"><div class="product-thumb">${imageUrl ? `<img src="${esc(preview(imageUrl))}" alt="">` : '⬡'}${!product.active ? '<b>INATIVO</b>' : ''}</div>` +
         `<div class="product-admin-info"><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong>${product.freeShippingText ? `<em class="admin-free-shipping">● ${esc(product.freeShippingText)}</em>` : ''}<p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
-        `<footer><button type="button" class="edit-product" data-edit="${esc(product.id)}">✎ Editar produto</button><button type="button" class="delete-product" data-delete="${esc(product.id)}" aria-label="Excluir ${esc(product.name)}">🗑</button></footer></article>`;
+        `<footer><div class="product-order-actions" aria-label="Alterar ordem de ${esc(product.name)}"><button type="button" data-move-product="${esc(product.id)}" data-direction="-1" aria-label="Mover ${esc(product.name)} para cima" title="Mover para cima">↑</button><button type="button" data-move-product="${esc(product.id)}" data-direction="1" aria-label="Mover ${esc(product.name)} para baixo" title="Mover para baixo">↓</button></div><button type="button" class="edit-product" data-edit="${esc(product.id)}">✎ Editar produto</button><button type="button" class="delete-product" data-delete="${esc(product.id)}" aria-label="Excluir ${esc(product.name)}">🗑</button></footer></article>`;
     }).join('');
+    $('#admin-products').querySelectorAll('[data-move-product]').forEach(button => {
+      const index = catalog.products.findIndex(product => product.id === button.dataset.moveProduct);
+      const direction = Number(button.dataset.direction);
+      button.disabled = index < 0 || index + direction < 0 || index + direction >= catalog.products.length;
+      button.onclick = () => {
+        const current = catalog.products.findIndex(product => product.id === button.dataset.moveProduct);
+        const target = current + direction;
+        if (current < 0 || target < 0 || target >= catalog.products.length) return;
+        [catalog.products[current], catalog.products[target]] = [catalog.products[target], catalog.products[current]];
+        renderProducts();
+        showToast('Ordem alterada. Clique em “Publicar alterações” para salvar.', 'success');
+      };
+    });
     $('#admin-products').querySelectorAll('[data-edit]').forEach(button => { button.onclick = () => openEditor(button.dataset.edit); });
     $('#admin-products').querySelectorAll('[data-delete]').forEach(button => {
       button.onclick = () => {
