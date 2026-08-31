@@ -768,7 +768,7 @@
     } else {
       lines.push('Receber na entrega: *' + money(order.total) + '*');
       lines.push('Forma: *' + paymentLabel(order.payment_method) + '*');
-      if (order.payment_method === 'card') lines.push('⚠️ Levar máquina de cartão.');
+      if (order.payment_method === 'card_delivery') lines.push('⚠️ Levar máquina de cartão.');
       if (order.payment_method === 'cash') {
         const changeFor = Number(String(order.change_for || '').replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
         if (changeFor > 0) lines.push('⚠️ Troco para: *' + money(changeFor) + '* — levar ' + money(Math.max(0, changeFor - Number(order.total || 0))) + ' de troco.');
