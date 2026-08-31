@@ -64,7 +64,7 @@
   "primaryColor": "#620853",
   "accentColor": "#fcd307",
   "brandBrightColor": "#620853",
-  "autoOpenWhatsApp": true,
+  "autoOpenWhatsApp": false,
   "orderRedirectEnabled": false,
   "orderRedirectUrl": "",
   "crmNotifications": {
