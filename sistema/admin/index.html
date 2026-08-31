@@ -8,7 +8,7 @@
   <link rel="icon" href="../../favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="48x48" href="../../assets/images/favicon/favicon-48.png">
   <link rel="apple-touch-icon" sizes="180x180" href="../../assets/images/favicon/apple-touch-icon.png">
-  <link rel="stylesheet" href="admin.css?v=20260830-operacao-seo">
+  <link rel="stylesheet" href="admin.css?v=20260831-mobile-panel">
   <style>
     .auth-screen{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#26011a,#620853)}
     .auth-card{width:min(440px,100%);background:#fff;border-radius:24px;padding:32px;box-shadow:0 24px 70px #19092366}
@@ -38,7 +38,7 @@
   <div class="admin-layout" id="admin-app" hidden>
     <aside>
       <a class="admin-logo" href="../../"><span><img src="../../assets/images/logo/logo-acai-do-bom.webp" alt="Açaí do Bom"></span><div><b>Açaí do Bom</b><small>GESTÃO DO CARDÁPIO</small></div></a>
-      <nav>
+      <nav aria-label="Seções do painel">
         <button class="active" data-tab="dashboard">▦ Visão geral</button>
         <button data-tab="orders">▣ Pedidos <b id="pending-badge">0</b></button>
         <button data-tab="customers">♙ Clientes <b id="customers-badge">0</b></button>
@@ -73,7 +73,7 @@
         <div class="customer-toolbar"><label>Buscar cliente<input id="customer-search" type="search" placeholder="Nome telefone ou e-mail"></label><label>Permissão de marketing<select id="customer-consent-filter"><option value="all">Todos os clientes</option><option value="yes">Aceitaram ofertas</option><option value="no">Sem autorização</option></select></label></div>
         <div class="customer-table-card"><div class="customer-table" id="customers-list"></div><p class="customer-export-note">Para campanhas de marketing, utilize somente os contatos marcados como “Aceitou ofertas”.</p></div>
       </section>
-      <section class="tab" data-panel="products"><div class="title row"><div><small>CATÁLOGO</small><h2>Produtos</h2><p id="product-count"></p></div><button class="primary" id="new-product">+ Novo produto</button></div><div class="product-list" id="admin-products"></div></section>
+      <section class="tab product-panel" data-panel="products"><div class="title row"><div><small>CATÁLOGO</small><h2>Produtos</h2><p id="product-count"></p></div><button class="primary" id="new-product">+ Novo produto</button></div><div class="product-list" id="admin-products"></div></section>
 
       <section class="tab" data-panel="appearance">
         <div class="title"><small>IDENTIDADE DA MARCA</small><h2>Aparência</h2><p>Altere logo, banner e cores sem mexer no código.</p></div>
@@ -110,12 +110,19 @@
     </main>
   </div>
 
-  <div class="dialog" id="product-dialog" hidden>
-    <form id="product-form"><button type="button" class="close" data-close-product>×</button><h2 id="editor-title">Novo produto</h2><div class="editor-scroll">
-      <div class="product-basic"><div><div class="image-guide compact"><b>Ideal: 1000 × 1000 px</b><span>JPG ou WebP quadrado · até 2 MB.</span></div><div class="product-photo" id="product-photo">⬡</div><label class="upload">Enviar ou trocar imagem<input type="file" data-upload="product" accept="image/jpeg,image/png,image/webp"></label><button type="button" class="remove-image" id="remove-product-image">Remover imagem</button><small class="upload-help">A imagem é otimizada automaticamente e não altera o tamanho do card.</small></div><div><label>Nome do produto<input id="edit-name" required></label><label>Categoria<select id="edit-category"></select></label><div class="two"><label>Preço base ou menor tamanho<input id="edit-price" type="number" step=".01" min="0" required></label><label>Selo<input id="edit-badge" placeholder="Mais pedido"></label></div><label>Mensagem verde no produto<input id="edit-free-shipping" placeholder="Ex: Frete grátis"></label></div></div>
-      <label>Descrição<textarea id="edit-description"></textarea></label><label>URL da imagem<input id="edit-image"></label><div class="two switches"><label><input id="edit-active" type="checkbox"> Produto ativo</label><label><input id="edit-featured" type="checkbox"> Destaque</label></div>
-      <section class="addons-editor"><header><div><h3>Adicionais e etapas</h3><p>Grupos obrigatórios ou opcionais para montar o pedido.</p></div><button type="button" id="add-group">+ Novo grupo</button></header><div id="addon-groups"></div></section>
-    </div><footer><button type="button" data-close-product>Cancelar</button><button class="primary" id="save-product">Confirmar e publicar produto</button></footer></form>
+  <div class="dialog" id="product-dialog" role="dialog" aria-modal="true" aria-labelledby="editor-title" hidden>
+    <form id="product-form">
+      <header class="editor-head"><div><small>EDIÇÃO DO PRODUTO</small><h2 id="editor-title">Novo produto</h2><p>Configure o produto, tamanhos e acompanhamentos.</p></div><button type="button" class="close" data-close-product aria-label="Fechar edição">×</button></header>
+      <div class="editor-scroll">
+        <div class="editor-progress" aria-label="Etapas da edição"><span><b>1</b> Dados</span><span><b>2</b> Adicionais</span><span><b>3</b> Publicar</span></div>
+        <section class="editor-block"><header class="editor-block-title"><span>1</span><div><h3>Dados do produto</h3><p>Imagem, nome, preço e exibição no cardápio.</p></div></header>
+          <div class="product-basic"><div class="product-media"><div class="image-guide compact"><b>Ideal: 1000 × 1000 px</b><span>JPG ou WebP quadrado · até 2 MB.</span></div><div class="product-photo" id="product-photo">⬡</div><label class="upload">Enviar ou trocar imagem<input type="file" data-upload="product" accept="image/jpeg,image/png,image/webp"></label><button type="button" class="remove-image" id="remove-product-image">Remover imagem</button><small class="upload-help">A imagem é otimizada automaticamente e não altera o tamanho do card.</small></div><div class="product-fields"><label>Nome do produto<input id="edit-name" required autocomplete="off"></label><label>Categoria<select id="edit-category"></select></label><div class="two"><label>Preço base ou menor tamanho<input id="edit-price" type="number" inputmode="decimal" step=".01" min="0" required></label><label>Selo<input id="edit-badge" placeholder="Mais pedido"></label></div><label>Mensagem verde no produto<input id="edit-free-shipping" placeholder="Ex: Frete grátis"></label></div></div>
+          <label>Descrição<textarea id="edit-description" rows="4"></textarea></label><label>URL da imagem<input id="edit-image" inputmode="url"></label><div class="two switches"><label><input id="edit-active" type="checkbox"> Produto ativo</label><label><input id="edit-featured" type="checkbox"> Destaque</label></div>
+        </section>
+        <section class="addons-editor editor-block"><header><div class="editor-block-title"><span>2</span><div><h3>Adicionais e etapas</h3><p>Crie tamanhos e acompanhamentos na ordem em que o cliente deve escolher.</p></div></div><button type="button" id="add-group">+ Novo grupo</button></header><div id="addon-groups"></div></section>
+      </div>
+      <footer><span class="editor-save-hint" id="editor-save-hint">Revise os dados antes de publicar.</span><button type="button" data-close-product>Cancelar</button><button class="primary" id="save-product">✓ Confirmar e publicar</button></footer>
+    </form>
   </div>
   <div class="confirm" id="confirm-delete" hidden><div><h3>Excluir produto?</h3><p>Ele será removido após publicar as alterações.</p><footer><button id="cancel-delete">Cancelar</button><button id="do-delete">Excluir</button></footer></div></div>
   <div class="confirm" id="confirm-order-delete" hidden><div><h3>Excluir pedido?</h3><p id="order-delete-message">O pedido e o histórico de automações serão removidos definitivamente.</p><footer><button id="cancel-order-delete">Voltar</button><button id="do-order-delete">Excluir pedido</button></footer></div></div>
@@ -123,6 +130,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../../assets/js/supabase-config.js"></script>
   <script src="../../assets/js/supabase-store.js"></script>
-  <script src="github-admin.js?v=20260830-operacao-seo"></script>
+  <script src="github-admin.js?v=20260831-mobile-panel"></script>
 </body>
 </html>
