@@ -402,3 +402,5 @@ body.dialog-open{overflow:hidden}
   .order-ticket.expanded .customer{grid-template-columns:1fr}
   .order-ticket.expanded .ticket-title>b{font-size:22px}
 }
+
+.order-actions [data-print-order]{background:#eef6ff!important;color:#174ea6!important}.order-actions [data-download-order]{background:#f3f8ed!important;color:#356b1f!important}.orders-board .order-actions [data-print-order],.orders-board .order-actions [data-download-order]{display:none}.orders-board .order-ticket.expanded .order-actions [data-print-order],.orders-board .order-ticket.expanded .order-actions [data-download-order]{display:block}
