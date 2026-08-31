@@ -7,6 +7,8 @@
   let privateSettings = { makeWebhookEnabled: false, makeWebhookUrl: '', available: false };
   let orders = [];
   let editing = null;
+  let editorDirty = false;
+  let editorUploadCount = 0;
   let deleting = null;
   let deletingOrderIds = [];
   let orderRefreshTimer = null;
@@ -902,9 +904,9 @@
     $('#admin-products').innerHTML = catalog.products.map(product => {
       const category = catalog.categories.find(item => item.id === product.categoryId);
       const imageUrl = product.imageUrl || category?.imageUrl || '';
-      return `<article><div class="product-thumb">${imageUrl ? `<img src="${esc(preview(imageUrl))}" alt="">` : '⬡'}${!product.active ? '<b>INATIVO</b>' : ''}</div>` +
-        `<div><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong>${product.freeShippingText ? `<em class="admin-free-shipping">● ${esc(product.freeShippingText)}</em>` : ''}<p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
-        `<footer><button data-edit="${esc(product.id)}">Editar</button><button data-delete="${esc(product.id)}">🗑</button></footer></article>`;
+      return `<article class="product-admin-card"><div class="product-thumb">${imageUrl ? `<img src="${esc(preview(imageUrl))}" alt="">` : '⬡'}${!product.active ? '<b>INATIVO</b>' : ''}</div>` +
+        `<div class="product-admin-info"><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong>${product.freeShippingText ? `<em class="admin-free-shipping">● ${esc(product.freeShippingText)}</em>` : ''}<p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
+        `<footer><button type="button" class="edit-product" data-edit="${esc(product.id)}">✎ Editar produto</button><button type="button" class="delete-product" data-delete="${esc(product.id)}" aria-label="Excluir ${esc(product.name)}">🗑</button></footer></article>`;
     }).join('');
     $('#admin-products').querySelectorAll('[data-edit]').forEach(button => { button.onclick = () => openEditor(button.dataset.edit); });
     $('#admin-products').querySelectorAll('[data-delete]').forEach(button => {
@@ -981,6 +983,33 @@
     $$('.admin-logo img').forEach(image => { image.src = preview(settings.logoUrl || 'assets/images/logo/logo-acai-do-bom.webp'); });
   }
 
+  function updateEditorState() {
+    const hint = $('#editor-save-hint');
+    const button = $('#save-product');
+    if (!hint || !button) return;
+    if (editorUploadCount > 0) {
+      hint.textContent = 'Aguarde o envio da imagem antes de publicar.';
+      hint.className = 'editor-save-hint uploading';
+      if (button.dataset.saving !== 'true') {
+        button.disabled = true;
+        button.textContent = 'Enviando imagem...';
+      }
+      return;
+    }
+    hint.textContent = editorDirty ? 'Alterações ainda não publicadas.' : 'Revise os dados antes de publicar.';
+    hint.className = `editor-save-hint${editorDirty ? ' dirty' : ''}`;
+    if (button.dataset.saving !== 'true') {
+      button.disabled = false;
+      button.textContent = '✓ Confirmar e publicar';
+    }
+  }
+
+  function markEditorDirty() {
+    if (!editing) return;
+    editorDirty = true;
+    updateEditorState();
+  }
+
   function openEditor(id) {
     editing = id
       ? structuredClone(catalog.products.find(product => product.id === id))
@@ -998,15 +1027,28 @@
     $('#edit-category').innerHTML = catalog.categories.map(category => `<option value="${esc(category.id)}" ${editing.categoryId === category.id ? 'selected' : ''}>${esc(`${category.emoji} ${category.name}`)}</option>`).join('');
     renderProductPhoto();
     renderGroups();
+    editorDirty = false;
+    editorUploadCount = 0;
+    updateEditorState();
     $('#product-dialog').hidden = false;
     document.body.classList.add('dialog-open');
-    requestAnimationFrame(() => $('#edit-name').focus());
+    $('.editor-scroll').scrollTop = 0;
+    requestAnimationFrame(() => {
+      if (matchMedia('(min-width: 761px)').matches) $('#edit-name').focus();
+    });
   }
 
-  function closeEditor() {
+  function closeEditor(force = false) {
+    if (!force && editorUploadCount > 0) {
+      notice('Aguarde o envio da imagem terminar.', true);
+      return;
+    }
+    if (!force && editorDirty && !window.confirm('Fechar sem publicar as alterações deste produto?')) return;
     $('#product-dialog').hidden = true;
     document.body.classList.remove('dialog-open');
     editing = null;
+    editorDirty = false;
+    editorUploadCount = 0;
   }
 
   function renderProductPhoto() {
@@ -1019,8 +1061,10 @@
       group.options = group.options || [];
       group.priceMode = group.priceMode === 'final' ? 'final' : 'additive';
       const priceHelp = group.priceMode === 'final' ? 'Digite o preço total de cada tamanho.' : 'Digite somente o acréscimo sobre o preço base.';
-      return `<article data-group="${esc(group.id)}"><header><input value="${esc(group.name)}" data-group-name><label><input type="checkbox" data-group-required ${group.required ? 'checked' : ''}> Obrigatório</label><label>Máx.<input type="number" min="1" value="${group.max || 1}" data-group-max></label><label class="group-price-mode">Tipo de preço<select data-group-price-mode><option value="additive" ${group.priceMode === 'additive' ? 'selected' : ''}>Acréscimo (+)</option><option value="final" ${group.priceMode === 'final' ? 'selected' : ''}>Preço final por tamanho</option></select></label><button type="button" data-remove-group>×</button></header><small class="group-price-help">${priceHelp}</small>` +
-        `<div class="options">${group.options.map(option => `<div class="option-row" data-option="${esc(option.id)}"><div class="option-thumb">${option.imageUrl ? `<img src="${esc(preview(option.imageUrl))}" alt="">` : '🥣'}</div><div class="option-fields"><input value="${esc(option.name)}" data-option-name placeholder="Nome do acompanhamento ou tamanho"><input value="${esc(option.imageUrl || '')}" data-option-image placeholder="URL da imagem"></div><label class="option-upload">Trocar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-option-upload></label><input class="option-price ${group.priceMode === 'final' ? 'final-price' : ''}" aria-label="${group.priceMode === 'final' ? 'Preço final' : 'Preço adicional'}" type="number" step=".01" min="0" value="${Number(option.price || 0)}" data-option-price><button type="button" data-remove-option aria-label="Excluir opção">🗑</button></div>`).join('')}<button type="button" data-add-option>+ Adicionar opção</button></div></article>`;
+      const priceLabel = group.priceMode === 'final' ? 'Preço final' : 'Acréscimo';
+      const options = group.options.length ? group.options.map(option => `<div class="option-row" data-option="${esc(option.id)}"><div class="option-thumb">${option.imageUrl ? `<img src="${esc(preview(option.imageUrl))}" alt="">` : '🥣'}</div><div class="option-fields"><label><span>Nome da opção</span><input value="${esc(option.name)}" data-option-name placeholder="Ex.: 500 ml ou Morango" required></label><label><span>URL da imagem</span><input value="${esc(option.imageUrl || '')}" data-option-image placeholder="https://..."></label></div><label class="option-upload">Trocar imagem<input type="file" accept="image/jpeg,image/png,image/webp" data-option-upload></label><label class="option-price-field"><span>${priceLabel}</span><input class="option-price ${group.priceMode === 'final' ? 'final-price' : ''}" aria-label="${priceLabel}" type="number" inputmode="decimal" step=".01" min="0" value="${Number(option.price || 0)}" data-option-price required></label><label class="option-available"><input type="checkbox" data-option-available ${option.available === false ? '' : 'checked'}> Disponível</label><button type="button" class="remove-option" data-remove-option aria-label="Excluir opção">🗑 Excluir</button></div>`).join('') : '<p class="options-empty">Nenhuma opção cadastrada neste grupo.</p>';
+      return `<article class="addon-group-card" data-group="${esc(group.id)}"><header><label class="group-name"><span>Nome do grupo</span><input value="${esc(group.name)}" data-group-name placeholder="Ex.: Escolha o tamanho" required></label><label class="group-required"><input type="checkbox" data-group-required ${group.required ? 'checked' : ''}> Escolha obrigatória</label><label class="group-max"><span>Máximo</span><input type="number" inputmode="numeric" min="1" max="99" value="${group.max || 1}" data-group-max></label><label class="group-price-mode"><span>Tipo de preço</span><select data-group-price-mode><option value="additive" ${group.priceMode === 'additive' ? 'selected' : ''}>Acréscimo (+)</option><option value="final" ${group.priceMode === 'final' ? 'selected' : ''}>Preço final por tamanho</option></select></label><button type="button" class="remove-group" data-remove-group>🗑 Excluir grupo</button></header><small class="group-price-help">${priceHelp}</small>` +
+        `<div class="options">${options}<button type="button" class="add-option" data-add-option>+ Adicionar opção</button></div></article>`;
     }).join('');
     $('#addon-groups').querySelectorAll('[data-group]').forEach(card => {
       const group = editing.addonGroups.find(item => item.id === card.dataset.group);
@@ -1035,17 +1079,26 @@
           option.price = Number((nextMode === 'final' ? Number(option.price || 0) + base : Math.max(0, Number(option.price || 0) - base)).toFixed(2));
         });
         group.priceMode = nextMode;
+        markEditorDirty();
         renderGroups();
       };
-      card.querySelector('[data-remove-group]').onclick = () => { editing.addonGroups = editing.addonGroups.filter(item => item.id !== group.id); renderGroups(); };
-      card.querySelector('[data-add-option]').onclick = () => { group.options.push({ id: crypto.randomUUID(), name: '', price: group.priceMode === 'final' ? Number($('#edit-price').value || editing.price || 0) : 0, imageUrl: '', available: true }); renderGroups(); };
+      card.querySelector('[data-remove-group]').onclick = () => { editing.addonGroups = editing.addonGroups.filter(item => item.id !== group.id); markEditorDirty(); renderGroups(); };
+      card.querySelector('[data-add-option]').onclick = () => {
+        group.options.push({ id: crypto.randomUUID(), name: '', price: group.priceMode === 'final' ? Number($('#edit-price').value || editing.price || 0) : 0, imageUrl: '', available: true });
+        markEditorDirty();
+        renderGroups();
+        const updatedCard = [...$('#addon-groups').querySelectorAll('[data-group]')].find(item => item.dataset.group === group.id);
+        const rows = updatedCard ? [...updatedCard.querySelectorAll('.option-row')] : [];
+        rows.at(-1)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      };
       card.querySelectorAll('[data-option]').forEach(row => {
         const option = group.options.find(item => item.id === row.dataset.option);
         row.querySelector('[data-option-name]').oninput = event => { option.name = event.target.value; };
         row.querySelector('[data-option-price]').oninput = event => { option.price = Math.max(0, Number(event.target.value) || 0); };
-        row.querySelector('[data-option-image]').onchange = event => { option.imageUrl = event.target.value.trim(); renderGroups(); };
+        row.querySelector('[data-option-image]').onchange = event => { option.imageUrl = event.target.value.trim(); markEditorDirty(); renderGroups(); };
+        row.querySelector('[data-option-available]').onchange = event => { option.available = event.target.checked; };
         row.querySelector('[data-option-upload]').onchange = event => upload(event.target, 'option', option.id);
-        row.querySelector('[data-remove-option]').onclick = () => { group.options = group.options.filter(item => item.id !== option.id); renderGroups(); };
+        row.querySelector('[data-remove-option]').onclick = () => { group.options = group.options.filter(item => item.id !== option.id); markEditorDirty(); renderGroups(); };
       });
     });
   }
@@ -1054,6 +1107,11 @@
     const file = input.files[0];
     if (!file) return;
     const holder = input.closest('label');
+    const belongsToProduct = Boolean(editing && (target === 'product' || target === 'option'));
+    if (belongsToProduct) {
+      editorUploadCount += 1;
+      updateEditorState();
+    }
     input.disabled = true;
     holder?.classList.add('busy');
     try {
@@ -1071,7 +1129,7 @@
         catalog.settings.infoStripIcons[referenceId] = url;
         renderInfoIcons();
       }
-      if (target === 'product' && editing) { editing.imageUrl = url; $('#edit-image').value = url; renderProductPhoto(); }
+      if (target === 'product' && editing) { editing.imageUrl = url; $('#edit-image').value = url; renderProductPhoto(); markEditorDirty(); }
       if (target === 'category') {
         const category = catalog.categories.find(item => item.id === referenceId);
         if (category) category.imageUrl = url;
@@ -1079,6 +1137,7 @@
       if (target === 'option' && editing) {
         const option = editing.addonGroups.flatMap(group => group.options || []).find(item => item.id === referenceId);
         if (option) option.imageUrl = url;
+        markEditorDirty();
         renderGroups();
       }
       if (target === 'notification') {
@@ -1100,6 +1159,10 @@
       input.value = '';
       input.disabled = false;
       holder?.classList.remove('busy');
+      if (belongsToProduct) {
+        editorUploadCount = Math.max(0, editorUploadCount - 1);
+        updateEditorState();
+      }
     }
   }
 
@@ -1193,6 +1256,8 @@
       button.onclick = () => {
         $$('[data-tab]').forEach(item => item.classList.toggle('active', item === button));
         $$('[data-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === button.dataset.tab));
+        button.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         if (button.dataset.tab === 'orders') { document.title = 'Pedidos | Açaí do Bom'; refreshOrders(false); }
         if (button.dataset.tab === 'customers') { document.title = 'Clientes | Açaí do Bom'; refreshOrders(false); }
       };
@@ -1234,39 +1299,66 @@
       renderOrders();
     };
     $('#new-product').onclick = () => openEditor();
-    $$('[data-close-product]').forEach(button => { button.onclick = closeEditor; });
+    $$('[data-close-product]').forEach(button => { button.onclick = () => closeEditor(false); });
+    $('#product-form').addEventListener('input', event => {
+      if (!editing) return;
+      if (event.target.id === 'edit-name') $('#editor-title').textContent = event.target.value.trim() || 'Novo produto';
+      markEditorDirty();
+    });
+    $('#product-form').addEventListener('change', markEditorDirty);
     $('#product-form').onsubmit = async event => {
       event.preventDefault();
       if (!editing) return;
+      const requiredWithoutOptions = editing.addonGroups.find(group => group.required && !(group.options || []).some(option => option.available !== false));
+      if (requiredWithoutOptions) {
+        notice(`O grupo obrigatório "${requiredWithoutOptions.name || 'Sem nome'}" precisa ter pelo menos uma opção disponível.`, true);
+        $(`[data-group="${CSS.escape(requiredWithoutOptions.id)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      editing.addonGroups.forEach(group => {
+        group.name = String(group.name || '').trim();
+        group.min = group.required ? 1 : 0;
+        group.max = Math.max(1, Number(group.max) || 1);
+        group.options = (group.options || []).map(option => ({ ...option, name: String(option.name || '').trim(), price: Math.max(0, Number(option.price) || 0), available: option.available !== false }));
+      });
       const button = $('#save-product');
+      const form = event.currentTarget;
       button.disabled = true;
       button.textContent = 'Publicando produto...';
+      button.dataset.saving = 'true';
+      form.classList.add('is-saving');
       editing.name = $('#edit-name').value.trim();
       editing.description = $('#edit-description').value.trim();
-      editing.price = Number($('#edit-price').value);
+      editing.price = Math.max(0, Number($('#edit-price').value) || 0);
       editing.badge = $('#edit-badge').value.trim();
       editing.freeShippingText = $('#edit-free-shipping').value.trim();
       editing.imageUrl = $('#edit-image').value.trim();
       editing.active = $('#edit-active').checked;
       editing.featured = $('#edit-featured').checked;
       editing.categoryId = $('#edit-category').value;
+      const productToSave = structuredClone(editing);
+      const previousProducts = catalog.products;
       const index = catalog.products.findIndex(product => product.id === editing.id);
-      if (index >= 0) catalog.products[index] = editing;
-      else catalog.products.push(editing);
+      catalog.products = index >= 0
+        ? catalog.products.map(product => product.id === productToSave.id ? productToSave : product)
+        : [...catalog.products, productToSave];
       try {
         await SupabaseStore.saveCatalog(catalog);
-        closeEditor();
+        editorDirty = false;
+        closeEditor(true);
         renderProducts();
         renderDashboard();
         notice('Produto confirmado e publicado no cardápio.');
       } catch (error) {
+        catalog.products = previousProducts;
         notice(error.message, true);
       } finally {
-        button.disabled = false;
-        button.textContent = 'Confirmar e publicar produto';
+        form.classList.remove('is-saving');
+        delete button.dataset.saving;
+        updateEditorState();
       }
     };
-    $('#add-group').onclick = () => { editing.addonGroups.push({ id: crypto.randomUUID(), name: 'Novo grupo', required: false, min: 0, max: 1, priceMode: 'additive', options: [] }); renderGroups(); };
+    $('#add-group').onclick = () => { editing.addonGroups.push({ id: crypto.randomUUID(), name: 'Novo grupo', required: false, min: 0, max: 1, priceMode: 'additive', options: [] }); markEditorDirty(); renderGroups(); $('#addon-groups article:last-child')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
     $('#add-delivery-zone').onclick = () => { catalog.settings.deliveryZones.push({ id: crypto.randomUUID(), name: 'Nova região', neighborhoods: [], postalPrefixes: [], fee: Number(catalog.settings.deliveryFee || 0), deliver: true }); renderDeliveryZones(); };
     $('#cancel-delete').onclick = () => {
       $('#confirm-delete').hidden = true;
@@ -1310,6 +1402,7 @@
       if (!editing) return;
       editing.imageUrl = '';
       $('#edit-image').value = '';
+      markEditorDirty();
       renderProductPhoto();
     };
     $('#toggle-make-webhook').onclick = () => {
