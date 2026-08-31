@@ -33,7 +33,7 @@
       orderNumber,
       note,
       stored,
-      whatsappUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(note)}` : '',
+      whatsappUrl: settings.autoOpenWhatsApp === true && phone ? `https://wa.me/${phone}?text=${encodeURIComponent(note)}` : '',
       customerEmail: payload.customer.email || '',
       pixKey: settings.pixKey || '',
       paymentUrl: extra.paymentUrl || (payload.paymentMethod === 'payment_link' ? (settings.paymentLink || '') : ''),
