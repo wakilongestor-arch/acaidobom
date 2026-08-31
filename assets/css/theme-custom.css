@@ -303,3 +303,56 @@ button,a,label{touch-action:manipulation}
 }
 @media(max-width:380px){.info-strip article{padding:8px;gap:6px}.info-strip i{flex-basis:31px;width:31px;height:31px}.footer-business-grid{grid-template-columns:1fr}.footer-business-grid>div:last-child{grid-column:auto}}
 @media(max-height:700px){.hours-modal>header{padding-top:15px;padding-bottom:10px}.hours-modal>header h2{font-size:20px}.hours-list{gap:6px}.hours-row-public{min-height:43px;padding-top:7px;padding-bottom:7px}.hours-modal>footer{padding-top:8px}}
+
+
+/* Preço e ação dos produtos alinhados em uma grade estável. */
+.product-copy footer{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 32px;
+  align-items:end;
+  gap:12px;
+}
+.product-copy footer .product-price{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  color:#1f1f1f;
+  font-weight:800;
+  line-height:1;
+}
+.product-price small{
+  color:var(--brand);
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.08em;
+  line-height:1;
+  text-transform:uppercase;
+}
+.product-price strong{
+  color:#1f1f1f;
+  font-size:18px;
+  font-weight:800;
+  line-height:1.15;
+  white-space:nowrap;
+}
+.product-copy footer>span{
+  justify-self:end;
+  align-self:end;
+  flex:0 0 auto;
+}
+@media(max-width:700px){
+  .product-copy footer{
+    grid-template-columns:minmax(0,1fr) 30px;
+    gap:8px;
+    min-height:36px;
+  }
+  .product-price small{font-size:8px}
+  .product-price strong{font-size:16px}
+  .product-copy footer>span{width:28px;height:28px;font-size:16px}
+}
+@media(max-width:380px){
+  .product-price strong{font-size:15px}
+}
