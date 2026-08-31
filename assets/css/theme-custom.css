@@ -419,3 +419,10 @@ button,a,label{touch-action:manipulation}
 .delivery-free-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .product-media>b{top:auto!important;bottom:7px!important;left:7px!important;right:auto;max-width:calc(100% - 14px)!important;padding:4px 7px!important;background:rgba(252,211,7,.94)!important;font-size:7px!important;line-height:1!important;box-shadow:0 2px 8px rgba(0,0,0,.12)}
 @media(max-width:700px){.delivery-free-icon{width:27px;height:27px}.delivery-free-icon svg{width:17px;height:17px}.product-media>b{font-size:6px!important;padding:3px 6px!important}}
+
+
+/* Ícone de entrega grátis compacto e personalizável. */
+.delivery-free-icon{top:6px;left:6px;width:24px;height:24px;border-width:1.5px;box-shadow:0 3px 9px rgba(22,163,74,.24)}
+.delivery-free-icon svg,.delivery-free-icon img{width:15px;height:15px;display:block;object-fit:contain}
+.delivery-free-icon img{border-radius:3px}
+@media(max-width:700px){.delivery-free-icon{width:22px;height:22px}.delivery-free-icon svg,.delivery-free-icon img{width:14px;height:14px}}
