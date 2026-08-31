@@ -913,8 +913,6 @@
     };
     const emailEvents = [];
     if (status !== order.status && statusEvents[status] && catalog.settings.crmNotifications?.[statusEvents[status]]?.enabled !== false) emailEvents.push(statusEvents[status]);
-    if (paymentStatus !== order.payment_status && paymentStatus === 'pago' && !emailEvents.includes('confirmed')) emailEvents.push('payment_paid');
-    if (paymentStatus !== order.payment_status && paymentStatus === 'estornado') emailEvents.push('payment_refunded');
     try {
       const result = await SupabaseStore.updateOrder(id, status, paymentStatus, emailEvents);
       order.status = status;
