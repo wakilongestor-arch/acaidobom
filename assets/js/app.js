@@ -466,7 +466,7 @@
     renderProductStep();
     $('#product-overlay').hidden = false;
     syncBodyLock();
-    requestAnimationFrame(() => $('#product-overlay .modal-close')?.focus());
+    requestAnimationFrame(() => $('#product-overlay .product-presentation-close')?.focus());
   }
 
   function changeSelection(input) {

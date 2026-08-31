@@ -16,3 +16,26 @@
 .email-confirmation{margin-top:10px;padding:12px 14px;border:1px solid #b9dfc4;border-radius:11px;background:#eefaf1;color:#176b32;font-size:12px;line-height:1.5;text-align:left}.email-confirmation.pending{border-color:#ead778;background:#fff9cf;color:#620853}
 
 .delivery-quote{margin:0;padding:10px 12px;border-radius:10px;background:#f4f0f5;color:#620853;font-size:13px;font-weight:750;line-height:1.45}.delivery-quote.blocked{background:#fff0f1;color:#a2182a}.delivery-quote.matched{background:#eef9f0;color:#216332}
+
+/* Apresentação do produto como página rolável */
+#product-overlay{padding:0;place-items:stretch;align-items:start;background:#1d0924aa;overflow-y:auto;overscroll-behavior:contain}
+#product-overlay>.product-modal{width:min(820px,100%);min-height:100vh;max-height:none;margin:0 auto;border-radius:0;overflow:visible;box-shadow:0 0 60px #12041744}
+#product-overlay .product-presentation-close{position:absolute;z-index:8;top:18px;right:22px;padding:8px 12px;border:0;border-radius:999px;background:#ffffffdd;color:#34153d;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 4px 16px #12041733}
+#product-overlay .product-presentation-close:hover{background:#fff;color:var(--brand);transform:translateY(-1px)}
+#product-overlay .product-modal-head{display:block;padding:0;background:#fff;border:0}
+#product-overlay .product-presentation-media{position:relative;height:clamp(260px,42vw,440px);background:#ead8ef}
+#product-overlay .product-presentation-media>img{display:block;width:100%;height:100%;object-fit:cover}
+#product-overlay .product-presentation-copy{padding:28px 32px 22px}
+#product-overlay .product-presentation-copy h2{margin:0 0 8px;font-size:clamp(28px,4vw,42px);line-height:1.05}
+#product-overlay .product-presentation-copy p{max-width:680px;margin:0 0 14px;font-size:15px;line-height:1.55}
+#product-overlay .product-presentation-copy>b{font-size:22px}
+#product-overlay .product-step-head{padding:20px 32px 12px;border-top:1px solid var(--line);background:#fff}
+#product-overlay .product-step-head small{display:block;margin-bottom:5px;color:var(--brand);font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+#product-overlay .product-step-head b{font-size:20px}
+#product-overlay .addon-list{max-height:none;padding:0 32px 24px;overflow:visible;background:#fff}
+#product-overlay .addon-list fieldset{margin:0;padding:0 0 18px}
+#product-overlay .addon-list label{min-height:58px;padding:12px 14px}
+#product-overlay .product-presentation-footer{position:sticky;bottom:0;z-index:7;padding:16px 32px calc(16px + env(safe-area-inset-bottom));background:#fff;box-shadow:0 -8px 24px #37144018}
+#product-overlay .product-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+#product-overlay .product-actions .primary{min-width:180px}
+@media(max-width:700px){#product-overlay>.product-modal{width:100%;min-height:100dvh}#product-overlay .product-presentation-close{top:12px;right:14px}#product-overlay .product-presentation-copy{padding:24px 20px 18px}#product-overlay .product-step-head{padding:18px 20px 10px}#product-overlay .addon-list{padding:0 20px 18px}#product-overlay .product-presentation-footer{padding:12px 20px calc(12px + env(safe-area-inset-bottom))}#product-overlay .product-actions{flex-wrap:wrap}#product-overlay .product-actions .primary{min-width:0;flex:1}}
