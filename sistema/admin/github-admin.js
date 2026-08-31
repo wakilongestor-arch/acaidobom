@@ -4,7 +4,7 @@
   const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
   let catalog = { settings: {}, categories: [], products: [] };
-  let privateSettings = { makeWebhookEnabled: false, makeWebhookUrl: '', available: false };
+  let privateSettings = { makeWebhookEnabled: false, makeWebhookUrl: '', driverDeliveryEnabled: false, driverName: '', driverWhatsapp: '', available: false };
   let orders = [];
   let editing = null;
   let editorDirty = false;
@@ -243,6 +243,10 @@
     $('#store-status-mode').value = settings.statusMode || 'open';
     $('#make-webhook-enabled').checked = Boolean(privateSettings.makeWebhookEnabled);
     $('#make-webhook-url').value = privateSettings.makeWebhookUrl || '';
+    $('#driver-delivery-enabled').checked = Boolean(privateSettings.driverDeliveryEnabled);
+    $('#driver-name').value = privateSettings.driverName || '';
+    $('#driver-whatsapp').value = privateSettings.driverWhatsapp || '';
+    updateDriverSettingsVisibility();
     updateMakeWebhookStatus(privateSettings.available
       ? 'Webhook protegido pronto para configuração.'
       : 'Execute a migração 003 no Supabase para liberar esta integração.', !privateSettings.available);
@@ -298,7 +302,44 @@
     collectCrmNotifications();
     privateSettings.makeWebhookEnabled = $('#make-webhook-enabled').checked;
     privateSettings.makeWebhookUrl = $('#make-webhook-url').value.trim();
+    privateSettings.driverDeliveryEnabled = $('#driver-delivery-enabled').checked;
+    privateSettings.driverName = $('#driver-name').value.trim();
+    privateSettings.driverWhatsapp = $('#driver-whatsapp').value.replace(/\D/g, '');
     collectHours();
+  }
+
+  function updateDriverSettingsVisibility() {
+    const enabled = $('#driver-delivery-enabled').checked;
+    $('#driver-delivery-fields').hidden = !enabled;
+  }
+
+  function setupSettingsAccordions() {
+    const cards = [...document.querySelectorAll('[data-panel="settings"] .settings-grid > .card')];
+    cards.forEach((card, index) => {
+      if (card.querySelector(':scope > .config-toggle')) return;
+      const title = card.querySelector('h3');
+      const label = title?.textContent?.trim() || 'Configuração';
+      if (title) title.classList.add('config-original-title');
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'config-toggle';
+      toggle.setAttribute('aria-expanded', index === 0 ? 'true' : 'false');
+      toggle.innerHTML = '<span>' + esc(label) + '</span><b aria-hidden="true">⌄</b>';
+      card.prepend(toggle);
+      card.classList.add('config-collapsible');
+      card.classList.toggle('config-open', index === 0);
+      toggle.onclick = () => {
+        const opening = !card.classList.contains('config-open');
+        cards.forEach(item => {
+          item.classList.remove('config-open');
+          item.querySelector(':scope > .config-toggle')?.setAttribute('aria-expanded', 'false');
+        });
+        if (opening) {
+          card.classList.add('config-open');
+          toggle.setAttribute('aria-expanded', 'true');
+        }
+      };
+    });
   }
 
   function splitRuleValues(value) {
@@ -1186,7 +1227,7 @@
     button.textContent = 'Publicando...';
     try {
       await SupabaseStore.saveCatalog(catalog);
-      if (privateSettings.available || privateSettings.makeWebhookEnabled || privateSettings.makeWebhookUrl) {
+      if (privateSettings.available || privateSettings.makeWebhookEnabled || privateSettings.makeWebhookUrl || privateSettings.driverDeliveryEnabled || privateSettings.driverWhatsapp) {
         privateSettings = await SupabaseStore.savePrivateSettings(privateSettings);
         updateMakeWebhookStatus(privateSettings.makeWebhookEnabled ? 'Webhook salvo e automação ativada.' : 'Webhook salvo; automação desativada.');
       }
