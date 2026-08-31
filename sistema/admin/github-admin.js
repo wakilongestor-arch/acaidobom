@@ -199,6 +199,8 @@
       return category;
     });
     catalog.products = (catalog.products || []).map(product => {
+      if (typeof product.freeShippingEnabled !== 'boolean') { product.freeShippingEnabled = Boolean(product.freeShippingText); changed = true; }
+      if (product.freeShippingEnabled && !product.freeShippingText) { product.freeShippingText = 'Entrega grátis'; changed = true; }
       product.addonGroups = (product.addonGroups || []).map(group => {
         if (!['additive', 'final'].includes(group.priceMode)) { group.priceMode = 'additive'; changed = true; }
         return group;
@@ -1166,14 +1168,15 @@
   function openEditor(id) {
     editing = id
       ? structuredClone(catalog.products.find(product => product.id === id))
-      : { id: crypto.randomUUID(), name: '', description: '', categoryId: catalog.categories[0]?.id || 'destaques', price: 0, imageUrl: '', featured: false, active: true, badge: '', freeShippingText: '', addonGroups: [] };
+      : { id: crypto.randomUUID(), name: '', description: '', categoryId: catalog.categories[0]?.id || 'destaques', price: 0, imageUrl: '', featured: false, active: true, badge: '', freeShippingEnabled: false, freeShippingText: 'Entrega grátis', addonGroups: [] };
     editing.addonGroups = editing.addonGroups || [];
     $('#editor-title').textContent = editing.name || 'Novo produto';
     $('#edit-name').value = editing.name;
     $('#edit-description').value = editing.description;
     $('#edit-price').value = editing.price;
     $('#edit-badge').value = editing.badge || '';
-    $('#edit-free-shipping').value = editing.freeShippingText || '';
+    $('#edit-free-shipping-enabled').checked = editing.freeShippingEnabled === true;
+    $('#edit-free-shipping').value = editing.freeShippingText || 'Entrega grátis';
     $('#edit-image').value = editing.imageUrl || '';
     $('#edit-active').checked = editing.active;
     $('#edit-featured').checked = editing.featured;
@@ -1486,7 +1489,8 @@
       editing.description = $('#edit-description').value.trim();
       editing.price = Math.max(0, Number($('#edit-price').value) || 0);
       editing.badge = $('#edit-badge').value.trim();
-      editing.freeShippingText = $('#edit-free-shipping').value.trim();
+      editing.freeShippingEnabled = $('#edit-free-shipping-enabled').checked;
+      editing.freeShippingText = $('#edit-free-shipping').value.trim() || 'Entrega grátis';
       editing.imageUrl = $('#edit-image').value.trim();
       editing.active = $('#edit-active').checked;
       editing.featured = $('#edit-featured').checked;
