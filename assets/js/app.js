@@ -387,40 +387,34 @@
   function validateGroup(group) {
     const minimum = Number(group?.min || 0);
     const chosen = (selections[group?.id] || []).length;
+    const field = [...$('#addon-list').querySelectorAll('fieldset')]
+      .find(item => item.dataset.group === String(group?.id));
+    field?.classList.toggle('invalid', chosen < minimum);
     if (chosen >= minimum) return true;
     const error = $('#product-error');
-    error.textContent = 'Escolha ' + minimum + (minimum === 1 ? ' opção' : ' opções') + ' em “' + group.name + '” para continuar.';
+    error.textContent = 'Escolha ' + minimum + (minimum === 1 ? ' opção' : ' opções') + ' em “' + group.name + '” para adicionar o produto.';
     error.hidden = false;
-    $('#addon-list input')?.focus({ preventScroll: true });
+    field?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    field?.querySelector('input')?.focus({ preventScroll: true });
     return false;
   }
 
   function renderProductStep() {
     if (!selected) return;
     const groups = productGroups();
-    const total = groups.length + 1;
-    productStep = Math.max(0, Math.min(productStep, total - 1));
-    const group = groups[productStep];
-    const isReview = !group;
     const addonList = $('#addon-list');
-    $('#product-step-label').textContent = 'Etapa ' + (productStep + 1) + ' de ' + total;
-    $('#product-step-title').textContent = isReview ? 'Revise e confirme' : group.name;
-    $('#product-step-back').textContent = productStep ? 'Voltar' : 'Cancelar';
-    $('#product-notes').hidden = !isReview;
-    $('#product-quantity').hidden = !isReview;
-    $('#product-overlay .modal-footer').classList.toggle('review-mode', isReview);
+    $('#product-step-label').textContent = 'PERSONALIZE SEU PEDIDO';
+    $('#product-step-title').textContent = 'Escolha todas as opções';
+    $('#product-notes').hidden = false;
+    $('#product-quantity').hidden = false;
+    $('#product-overlay .modal-footer').classList.remove('review-mode');
     $('#product-error').hidden = true;
 
-    if (isReview) {
-      const summary = groups.filter(item => (selections[item.id] || []).length).map(item =>
-        '<div><b>' + escape(item.name) + '</b><span>' + selections[item.id].map(option => escape(option.name)).join(', ') + '</span></div>'
-      ).join('');
-      addonList.innerHTML = '<section class="product-review"><h3>Seu produto</h3>' +
-        (summary || '<p>Este produto não precisa de opções adicionais.</p>') + '</section>';
-    } else {
+    if (groups.length) {
+      addonList.innerHTML = groups.map(group => {
       const maximum = Number(group.max || 1);
       const minimum = Number(group.min || 0);
-      addonList.innerHTML = '<fieldset data-group="' + escape(group.id) + '"><legend><span><b>' + escape(group.name) + '</b><small>' +
+      return '<fieldset data-group="' + escape(group.id) + '"><legend><span><b>' + escape(group.name) + '</b><small>' +
         (minimum ? 'Escolha pelo menos ' + minimum : 'Opcional') + ' · até ' + maximum +
         '</small></span>' + (minimum ? '<em>OBRIGATÓRIO</em>' : '') + '</legend><div class="addon-options">' +
         group.options.map(option => {
@@ -431,9 +425,11 @@
             escape(option.name) + '</b><small>' + (group.priceMode === 'final' ? MenuAPI.money(option.price) : (option.price ? '+ ' + MenuAPI.money(option.price) : 'Incluso')) +
             '</small></span><i aria-hidden="true">＋</i></label>';
         }).join('') + '</div></fieldset>';
+      }).join('');
       bindImageFallbacks(addonList);
+    } else {
+      addonList.innerHTML = '<section class="product-review"><p>Este produto não precisa de opções adicionais.</p></section>';
     }
-    addonList.scrollTop = 0;
     updateProductTotal();
   }
 
@@ -464,9 +460,11 @@
     $('#product-delivery-label').classList.toggle('free', freeShipping);
     $('#item-notes').value = '';
     renderProductStep();
-    $('#product-overlay').hidden = false;
+    const overlay = $('#product-overlay');
+    overlay.hidden = false;
+    overlay.scrollTop = 0;
     syncBodyLock();
-    requestAnimationFrame(() => $('#product-overlay .modal-close')?.focus());
+    requestAnimationFrame(() => $('#product-overlay .product-presentation-close')?.focus());
   }
 
   function changeSelection(input) {
@@ -494,6 +492,7 @@
       selections[group.id] = current.filter(item => item.id !== option.id);
       input.closest('.addon-option').classList.remove('selected');
     }
+    field.classList.remove('invalid');
     $('#product-error').hidden = true;
     updateProductTotal();
   }
@@ -511,20 +510,12 @@
   function updateProductTotal() {
     $('#item-quantity').textContent = quantity;
     const total = unitTotal() * quantity;
-    const isReview = productStep >= productGroups().length;
     $('#product-action-price').textContent = MenuAPI.money(total);
-    $('#add-to-cart').textContent = isReview ? 'Adicionar' : 'Continuar';
+    $('#add-to-cart').textContent = 'Adicionar ao pedido';
   }
 
   function advanceProduct() {
     if (!selected) return;
-    const groups = productGroups();
-    if (productStep < groups.length) {
-      if (!validateGroup(groups[productStep])) return;
-      productStep += 1;
-      renderProductStep();
-      return;
-    }
     addProduct();
   }
 
@@ -541,16 +532,7 @@
   function addProduct() {
     if (!selected) return;
     for (const group of productGroups()) {
-      if ((selections[group.id] || []).length < Number(group.min || 0)) {
-        const error = $('#product-error');
-        error.textContent = 'Escolha ' + Number(group.min || 1) + ' opção em “' + group.name + '”.';
-        error.hidden = false;
-        productStep = productGroups().findIndex(item => item.id === group.id);
-        renderProductStep();
-        $('#product-error').textContent = 'Escolha ' + Number(group.min || 1) + ' opção em “' + group.name + '”.';
-        $('#product-error').hidden = false;
-        return;
-      }
+      if (!validateGroup(group)) return;
     }
     const cartItem = {
       productId: selected.id,
