@@ -436,3 +436,30 @@ button,a,label{touch-action:manipulation}
   .free-shipping img{width:16px;height:16px}
   .delivery-free-icon img{width:17px;height:17px}
 }
+
+
+/* Tipografia legível inspirada na referência e proteção de desempenho. */
+.product-card{content-visibility:auto;contain-intrinsic-size:172px}
+.product-card:nth-child(-n+4){content-visibility:visible}
+.product-card>button,.product-copy h3,.product-copy p,.product-price{font-family:Arial,Helvetica,sans-serif}
+.product-copy h3{font-weight:500;letter-spacing:-.015em;line-height:1.2}
+.product-copy p{font-weight:400;letter-spacing:-.006em;color:#686868}
+.product-price small{font-weight:600;letter-spacing:0}
+.product-price strong{font-weight:600;letter-spacing:-.018em}
+.free-shipping{gap:6px;padding:5px 9px;border:1px solid #b9e4c7;border-radius:8px;background:#effaf2;color:#11753a;font-weight:800}
+.open-status{border:1px solid #b8e1c5;background:#eaf7ee;color:#13723a;box-shadow:none;animation:none}
+.open-status::before{width:8px;height:8px;border:0;background:#20a453;animation:status-dot-pulse-green 2.8s ease-out infinite}
+.open-status.closed{border-color:#ffd0c4;background:#fff0eb;color:#c53f20;box-shadow:none;animation:none}
+.open-status.closed::before{background:#e65332;border:0;animation:none}
+@keyframes status-dot-pulse-green{0%{box-shadow:0 0 0 0 rgba(32,164,83,.35)}75%,100%{box-shadow:0 0 0 5px rgba(32,164,83,0)}}
+.reservation-fields{margin:14px 0;padding:14px;border:1px solid #b8e1c5;border-radius:14px;background:#f2fbf5;display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,.7fr);gap:14px;align-items:end}
+.reservation-fields[hidden]{display:none}
+.reservation-fields small{color:#13723a;font-size:9px;font-weight:900;letter-spacing:.12em}
+.reservation-fields h3{margin:3px 0 5px;font:700 18px Arial,Helvetica,sans-serif}
+.reservation-fields p{margin:0;color:#5d6c62;font-size:12px;line-height:1.4}
+@media(max-width:700px){
+  .product-card{contain-intrinsic-size:142px}
+  .product-copy h3{font-size:17px;font-weight:500}
+  .product-copy p{font-size:12px}
+  .reservation-fields{grid-template-columns:1fr}
+}

@@ -289,7 +289,7 @@
 
   function imageMarkup(url, alt, fallback, lazy = true) {
     if (!url) return '<em>' + escape(fallback) + '</em>';
-    return '<img src="' + escape(url) + '" alt="' + escape(alt) + '"' + (lazy ? ' loading="lazy"' : '') + '><em hidden>' + escape(fallback) + '</em>';
+    return '<img src="' + escape(url) + '" alt="' + escape(alt) + '" decoding="async"' + (lazy ? ' loading="lazy"' : ' fetchpriority="high"') + '><em hidden>' + escape(fallback) + '</em>';
   }
 
   function bindImageFallbacks(root) {
@@ -745,8 +745,8 @@
     const state = calculateStoreState();
     window.ACAI_STORE_STATE = state;
     const button = $('#start-checkout');
-    button.disabled = !state.open;
-    button.textContent = state.open ? 'Finalizar pedido →' : 'Loja fechada';
+    button.disabled = false;
+    button.textContent = state.open ? 'Finalizar pedido →' : 'Reservar pedido →';
     $('#minimum-order').textContent = state.open
       ? 'Pedido mínimo para entrega: ' + MenuAPI.money(catalog.settings.minOrder)
       : state.text;
@@ -847,13 +847,13 @@
     $('#add-to-cart').addEventListener('click', advanceProduct);
     $('#start-checkout').addEventListener('click', () => {
       const state = calculateStoreState();
-      if (!state.open) {
-        refreshStoreStatus();
-        return;
-      }
+      const reservation = !state.open;
       closeCart();
-      if (Checkout.open(catalog)) {
-        MenuAPI.trackEcommerce('begin_checkout', CartStore.get(), { value: CartStore.subtotal() });
+      if (Checkout.open(catalog, { reservation })) {
+        MenuAPI.trackEcommerce('begin_checkout', CartStore.get(), {
+          value: CartStore.subtotal(),
+          checkout_mode: reservation ? 'reservation' : 'order'
+        });
       }
     });
     document.addEventListener('keydown', event => {

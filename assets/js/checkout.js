@@ -5,6 +5,7 @@
   let lastRestoredPhone = '';
   let phoneTimer = null;
   let redirectTimer = null;
+  let reservationMode = false;
   const profileStorageKey = 'acai_customer_profiles_v1';
   const $ = selector => document.querySelector(selector);
 
@@ -124,9 +125,19 @@
     catch (error) { console.warn('Não foi possível remover os dados lembrados neste aparelho.', error); }
   }
 
-  function open(nextCatalog) {
-    if (window.MenuStoreStatus && !window.MenuStoreStatus.get().open) return false;
+  function open(nextCatalog, options = {}) {
     catalog = nextCatalog;
+    reservationMode = options.reservation === true;
+    const reservationFields = $('#reservation-fields');
+    if (reservationFields) reservationFields.hidden = !reservationMode;
+    const reservationInput = $('#reservation-at');
+    if (reservationMode && reservationInput) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 60 - (now.getMinutes() % 30), 0, 0);
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      reservationInput.min = local;
+      if (!reservationInput.value) reservationInput.value = local;
+    }
     clearTimeout(redirectTimer);
     step = 1;
     lastRestoredPhone = '';
@@ -148,6 +159,7 @@
     $('#checkout-form').hidden = false;
     $('#checkout-form').reset();
     step = 1;
+    reservationMode = false;
     resetLocationStatus();
     render();
   }
@@ -270,19 +282,26 @@
       `<hr><div><span>Subtotal</span><b>${MenuAPI.money(CartStore.subtotal())}</b></div>` +
       `<div><span>${quote.zone?.name ? `Entrega · ${quote.zone.name}` : 'Entrega'}</span><b>${MenuAPI.money(delivery)}</b></div>` +
       `<div class="total"><span>Total</span><b>${MenuAPI.money(total)}</b></div>`;
-    $('#checkout-submit').textContent = `Confirmar · ${MenuAPI.money(total)}`;
+    $('#checkout-submit').textContent = reservationMode ? `Reservar · ${MenuAPI.money(total)}` : `Confirmar · ${MenuAPI.money(total)}`;
   }
 
   async function submit(event) {
     event.preventDefault();
-    if (window.MenuStoreStatus && !window.MenuStoreStatus.get().open) {
+    const storeState = window.MenuStoreStatus?.get?.() || { open: true };
+    const isReservation = reservationMode && !storeState.open;
+    const data = formData();
+    if (!storeState.open && !isReservation) {
       const error = $('#checkout-error');
-      error.textContent = 'A loja está fechada neste momento. Seu carrinho continuará salvo para você pedir quando abrir.';
+      error.textContent = 'A loja está fechada. Use a opção de reservar o pedido.';
       error.hidden = false;
-      window.MenuStoreStatus.refresh();
       return;
     }
-    const data = formData();
+    if (isReservation && (!data.reservationAt || new Date(data.reservationAt).getTime() <= Date.now())) {
+      const error = $('#checkout-error');
+      error.textContent = 'Escolha uma data e um horário futuros para a reserva.';
+      error.hidden = false;
+      return;
+    }
     const quote = deliveryQuote(data);
     const delivery = quote.fee;
     if (data.fulfillment === 'delivery' && (normalizePostalCode(data.zip).length !== 8 || !String(data.neighborhood || '').trim())) {
@@ -331,7 +350,11 @@
       },
       paymentMethod: data.paymentMethod || 'pix',
       changeFor: data.changeFor || '',
-      notes: data.notes || '',
+      isReservation,
+      reservationAt: isReservation ? data.reservationAt : '',
+      notes: isReservation
+        ? `[RESERVA PARA ${new Date(data.reservationAt).toLocaleString('pt-BR')}] ${data.notes || ''}`.trim()
+        : (data.notes || ''),
       items: CartStore.get(),
       subtotal: CartStore.subtotal(),
       deliveryFee: delivery,
@@ -347,7 +370,7 @@
       if (data.rememberProfile === '1') saveProfile(payload);
       else removeProfile(payload.customer.phone);
       CartStore.clear();
-      showSuccess(result, data.name);
+      showSuccess(result, data.name, isReservation);
       if (whatsappWindow) {
         if (result.whatsappUrl) whatsappWindow.location.replace(result.whatsappUrl);
         else whatsappWindow.close();
@@ -362,13 +385,15 @@
     }
   }
 
-  function showSuccess(result, name) {
+  function showSuccess(result, name, isReservation = false) {
     $('#checkout-form').hidden = true;
     const box = $('#order-success');
     box.hidden = false;
-    const title = result.stored ? 'PEDIDO REGISTRADO' : 'PEDIDO PRONTO';
+    const title = result.stored ? (isReservation ? 'RESERVA REGISTRADA' : 'PEDIDO REGISTRADO') : 'PEDIDO PRONTO';
     const message = result.stored
-      ? 'Sua solicitação de pedido foi recebida. Fique de olho no seu e-mail e aguarde a confirmação da loja antes de considerar o pedido aprovado.'
+      ? (isReservation
+        ? 'Sua reserva foi recebida. Fique de olho no seu e-mail e aguarde a confirmação da loja.'
+        : 'Sua solicitação de pedido foi recebida. Fique de olho no seu e-mail e aguarde a confirmação da loja antes de considerar o pedido aprovado.')
       : 'Não foi possível registrar sua solicitação. Volte ao cardápio e tente novamente.';
     const emailNotice = result.stored && result.customerEmail
       ? (result.emailAutomationConfigured

@@ -1047,7 +1047,7 @@
       const category = catalog.categories.find(item => item.id === product.categoryId);
       const imageUrl = product.imageUrl || category?.imageUrl || '';
       return `<article class="product-admin-card"><div class="product-thumb">${imageUrl ? `<img src="${esc(preview(imageUrl))}" alt="">` : '⬡'}${!product.active ? '<b>INATIVO</b>' : ''}</div>` +
-        `<div class="product-admin-info"><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong>${product.freeShippingText ? `<em class="admin-free-shipping">● ${esc(product.freeShippingText)}</em>` : ''}<p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
+        `<div class="product-admin-info"><small>${esc(category?.name || '')}</small><h3>${esc(product.name)}</h3><strong>${money(product.price)}</strong>${product.freeShippingEnabled === true ? `<em class="admin-free-shipping"><img src="../../assets/images/icone-capacete-entrega-gratis.svg" alt=""> <b>${esc(product.freeShippingText || 'Entrega grátis')}</b></em>` : ''}<p>${(product.addonGroups || []).length} grupos de adicionais</p></div>` +
         `<footer><div class="product-order-actions" aria-label="Alterar ordem de ${esc(product.name)}"><button type="button" data-move-product="${esc(product.id)}" data-direction="-1" aria-label="Mover ${esc(product.name)} para cima" title="Mover para cima">↑</button><button type="button" data-move-product="${esc(product.id)}" data-direction="1" aria-label="Mover ${esc(product.name)} para baixo" title="Mover para baixo">↓</button></div><button type="button" class="edit-product" data-edit="${esc(product.id)}">✎ Editar produto</button><button type="button" class="delete-product" data-delete="${esc(product.id)}" aria-label="Excluir ${esc(product.name)}">🗑</button></footer></article>`;
     }).join('');
     $('#admin-products').querySelectorAll('[data-move-product]').forEach(button => {
@@ -1165,6 +1165,13 @@
     updateEditorState();
   }
 
+  function syncFreeShippingField() {
+    const enabled = $('#edit-free-shipping-enabled')?.checked === true;
+    const field = $('#free-shipping-label-field');
+    if (field) field.hidden = !enabled;
+    if (enabled && !$('#edit-free-shipping').value.trim()) $('#edit-free-shipping').value = 'Entrega grátis';
+  }
+
   function openEditor(id) {
     editing = id
       ? structuredClone(catalog.products.find(product => product.id === id))
@@ -1177,6 +1184,7 @@
     $('#edit-badge').value = editing.badge || '';
     $('#edit-free-shipping-enabled').checked = editing.freeShippingEnabled === true;
     $('#edit-free-shipping').value = editing.freeShippingText || 'Entrega grátis';
+    syncFreeShippingField();
     $('#edit-image').value = editing.imageUrl || '';
     $('#edit-active').checked = editing.active;
     $('#edit-featured').checked = editing.featured;
@@ -1463,7 +1471,10 @@
       if (event.target.id === 'edit-name') $('#editor-title').textContent = event.target.value.trim() || 'Novo produto';
       markEditorDirty();
     });
-    $('#product-form').addEventListener('change', markEditorDirty);
+    $('#product-form').addEventListener('change', event => {
+      if (event.target.id === 'edit-free-shipping-enabled') syncFreeShippingField();
+      markEditorDirty();
+    });
     $('#product-form').onsubmit = async event => {
       event.preventDefault();
       if (!editing) return;
@@ -1490,7 +1501,7 @@
       editing.price = Math.max(0, Number($('#edit-price').value) || 0);
       editing.badge = $('#edit-badge').value.trim();
       editing.freeShippingEnabled = $('#edit-free-shipping-enabled').checked;
-      editing.freeShippingText = $('#edit-free-shipping').value.trim() || 'Entrega grátis';
+      editing.freeShippingText = editing.freeShippingEnabled ? ($('#edit-free-shipping').value.trim() || 'Entrega grátis') : '';
       editing.imageUrl = $('#edit-image').value.trim();
       editing.active = $('#edit-active').checked;
       editing.featured = $('#edit-featured').checked;

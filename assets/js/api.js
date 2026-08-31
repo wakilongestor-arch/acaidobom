@@ -59,7 +59,7 @@
         let emailNotificationError = '';
         let paymentUrl = '';
         const trackingConsent = window.MenuConsent?.get() || { marketing: false };
-        if (saved?.id && payload.customer.marketingConsent === true && trackingConsent.marketing === true) {
+        if (!payload.isReservation && saved?.id && payload.customer.marketingConsent === true && trackingConsent.marketing === true) {
           try {
             const metaConversion = await window.SupabaseStore.notifyMetaPurchase(saved.id, eventId);
             if (metaConversion.sent !== true && metaConversion.skipped !== true && metaConversion.configured !== false) {
@@ -168,6 +168,7 @@
     window.dataLayer.push({
       event: eventName,
       ...campaign,
+      checkout_mode: extra.checkout_mode || 'order',
       value,
       currency: 'BRL',
       items,
@@ -206,9 +207,11 @@
       quantity: Math.max(1, Number(item.quantity) || 1)
     }));
     window.dataLayer = window.dataLayer || [];
+    const eventName = payload.isReservation ? 'reservation_request' : 'purchase';
     window.dataLayer.push({
-      event: 'purchase',
+      event: eventName,
       transaction_id: orderNumber,
+      reservation_at: payload.reservationAt || '',
       event_id: eventId,
       marketing_consent: marketingConsent,
       checkout_marketing_consent: checkoutMarketingConsent,
@@ -225,11 +228,11 @@
       items,
       ecommerce: { transaction_id: orderNumber, event_id: eventId, value, currency: 'BRL', items }
     });
-    if (marketingConsent && !settings.gtmId && typeof window.fbq === 'function') {
+    if (!payload.isReservation && marketingConsent && !settings.gtmId && typeof window.fbq === 'function') {
       window.fbq('track', 'Purchase', { value, currency: 'BRL' }, { eventID: eventId });
     }
     if (window.__ACAI_DIRECT_GA4__ === true && consentState.analytics === true && typeof window.gtag === 'function') {
-      window.gtag('event', 'purchase', {
+      window.gtag('event', eventName, {
         transaction_id: orderNumber,
         event_id: eventId,
         value,
