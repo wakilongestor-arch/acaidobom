@@ -426,3 +426,13 @@ button,a,label{touch-action:manipulation}
 .delivery-free-icon svg,.delivery-free-icon img{width:15px;height:15px;display:block;object-fit:contain}
 .delivery-free-icon img{border-radius:3px}
 @media(max-width:700px){.delivery-free-icon{width:22px;height:22px}.delivery-free-icon svg,.delivery-free-icon img{width:14px;height:14px}}
+
+
+/* Capacete de motociclista fixo para produtos com entrega grátis. */
+.free-shipping img{width:17px;height:17px;display:block;object-fit:contain;flex:0 0 auto}
+.delivery-free-icon{background:#fff;border-color:#16a34a;color:#16a34a}
+.delivery-free-icon img{width:19px;height:19px;border-radius:0;display:block;object-fit:contain}
+@media(max-width:700px){
+  .free-shipping img{width:16px;height:16px}
+  .delivery-free-icon img{width:17px;height:17px}
+}
