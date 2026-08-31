@@ -38,9 +38,6 @@ Deno.serve(async req => {
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { data: order, error } = await db.from('orders').select('*').eq('id', orderId).single();
   if (error || !order) return json({ error: 'Pedido não encontrado.' }, 404);
-  const createdAt = new Date(order.created_at).getTime();
-  if (!Number.isFinite(createdAt) || Date.now() - createdAt > 30 * 60 * 1000) return json({ error: 'O prazo para notificar este pedido expirou.' }, 403);
-  if (order.notification_status === 'enviado') return json({ sent: true, duplicate: true });
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneId}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

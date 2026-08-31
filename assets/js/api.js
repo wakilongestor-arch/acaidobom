@@ -50,8 +50,7 @@
     if (window.SupabaseStore?.configured) {
       try {
         const saved = await window.SupabaseStore.createOrder(payload, orderNumber);
-        const confirmedOrderNumber = saved?.order_number || orderNumber;
-        const eventId = trackOrder(payload, confirmedOrderNumber);
+        const eventId = trackOrder(payload, orderNumber);
         const settings = window.ACAI_CATALOG?.settings || {};
         let notificationSent = false;
         let notificationError = '';
@@ -97,7 +96,7 @@
             console.error('Pedido salvo; falha ao criar checkout.', error);
           }
         }
-        return orderResult(confirmedOrderNumber, payload, true, {
+        return orderResult(orderNumber, payload, true, {
           notificationSent,
           notificationError,
           storeEmailSent,
@@ -110,13 +109,7 @@
       }
     }
 
-    let orders = [];
-    try {
-      const parsed = JSON.parse(localStorage.getItem('acai_orders') || '[]');
-      orders = Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      try { localStorage.removeItem('acai_orders'); } catch (__) {}
-    }
+    const orders = JSON.parse(localStorage.getItem('acai_orders') || '[]');
     orders.unshift({
       id: crypto.randomUUID(),
       number: orderNumber,
@@ -124,7 +117,7 @@
       createdAt: new Date().toISOString(),
       ...payload
     });
-    try { localStorage.setItem('acai_orders', JSON.stringify(orders.slice(0, 30))); } catch (_) {}
+    localStorage.setItem('acai_orders', JSON.stringify(orders.slice(0, 30)));
     return orderResult(orderNumber, payload, false);
   }
 
