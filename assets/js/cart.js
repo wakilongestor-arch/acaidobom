@@ -9,6 +9,7 @@
   function clear(){ items=[]; persist(); }
   function subtotal(){ return items.reduce((sum,i)=>sum+i.unitTotal*i.quantity,0); }
   function count(){ return items.reduce((sum,i)=>sum+i.quantity,0); }
+  function hasFreeShipping(){ return items.some(i=>i.freeShippingEnabled===true); }
   function subscribe(fn){ listeners.add(fn); fn(get()); return ()=>listeners.delete(fn); }
-  window.CartStore={get,add,remove,quantity,clear,subtotal,count,subscribe};
+  window.CartStore={get,add,remove,quantity,clear,subtotal,count,hasFreeShipping,subscribe};
 })();
