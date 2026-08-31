@@ -285,3 +285,120 @@ body.dialog-open{overflow:hidden}
   .config-collapsible.config-open>:last-child{margin-bottom:14px}
   .order-actions .send-driver{width:100%;justify-content:center}
 }
+
+
+/* A ação do motoboy deve permanecer visível no cartão recolhido do CRM. */
+.orders-board .order-actions a.send-driver{
+  display:block!important;
+  grid-column:1/-1;
+  padding:11px 12px;
+}
+
+/* Nota completa no visual de cupom fiscal. */
+.order-ticket.expanded{
+  background:#fff8dc!important;
+  border:1px solid #d8cda8!important;
+  border-left:1px solid #d8cda8!important;
+  box-shadow:0 10px 28px rgba(55,42,10,.12);
+  color:#191919;
+  font-family:"Courier New",Courier,monospace;
+}
+.order-ticket.expanded .ticket-head{
+  padding:5px 0 14px;
+  border-bottom:2px dashed #4d493d;
+  display:grid;
+  justify-items:center;
+  gap:7px;
+  text-align:center;
+}
+.order-ticket.expanded .ticket-title{
+  display:grid!important;
+  justify-items:center;
+  gap:7px!important;
+}
+.order-ticket.expanded .ticket-title>b{
+  font-size:25px;
+  line-height:1;
+}
+.order-ticket.expanded .ticket-head>strong{
+  font-size:20px!important;
+}
+.order-ticket.expanded .customer{
+  margin-top:13px;
+  padding-bottom:12px;
+  border-bottom:1px dashed #6f6958;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+.order-ticket.expanded .customer span,
+.order-ticket.expanded .customer a{color:#191919}
+.order-ticket.expanded .order-section-title{
+  margin:14px 0 9px;
+  color:#191919;
+  font:900 12px "Courier New",Courier,monospace;
+  letter-spacing:.08em;
+}
+.order-ticket.expanded .order-items{
+  padding:2px 0 11px;
+  border-bottom:1px dashed #6f6958;
+}
+.order-ticket.expanded .order-item{
+  padding:9px 0;
+  border-bottom:1px dotted #a79f84;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:5px 12px;
+}
+.order-ticket.expanded .order-item:last-child{border-bottom:0}
+.order-ticket.expanded .order-item small{grid-column:1/-1;line-height:1.45}
+.order-ticket.expanded .order-address,
+.order-ticket.expanded .order-notes{
+  margin:12px 0 0;
+  padding:12px 0;
+  border:0;
+  border-bottom:1px dashed #6f6958;
+  border-radius:0;
+  background:transparent;
+  color:#191919;
+  line-height:1.5;
+}
+.order-ticket.expanded .order-meta{
+  margin:12px 0;
+  padding-bottom:12px;
+  border-bottom:1px dashed #6f6958;
+}
+.order-ticket.expanded .order-meta span{
+  border-radius:4px;
+  font-family:Arial,sans-serif;
+}
+.receipt-payment-note{font-weight:900}
+.receipt-payment-note.card{background:#ffe0b2!important;color:#9a3412!important}
+.receipt-payment-note.cash{background:#fff0b3!important;color:#6b4600!important}
+.receipt-payment-note.paid{background:#dcfce7!important;color:#166534!important}
+.order-ticket.expanded .order-totals{
+  margin:12px 0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.order-ticket.expanded .order-totals div{
+  padding:4px 0;
+  font-size:13px;
+}
+.order-ticket.expanded .order-totals .grand-total{
+  margin-top:7px;
+  padding-top:10px;
+  border-top:2px dashed #4d493d;
+  color:#191919;
+  font-size:19px;
+}
+.order-ticket.expanded .order-footer{
+  font-family:Arial,sans-serif;
+  border-top:2px dashed #4d493d;
+}
+@media(max-width:700px){
+  .order-ticket.expanded .customer{grid-template-columns:1fr}
+  .order-ticket.expanded .ticket-title>b{font-size:22px}
+}
