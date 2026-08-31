@@ -309,9 +309,10 @@ button,a,label{touch-action:manipulation}
 .product-copy footer{
   width:100%;
   display:grid;
-  grid-template-columns:minmax(0,1fr) 32px;
+  grid-template-columns:max-content 32px;
+  justify-content:start;
   align-items:end;
-  gap:12px;
+  gap:10px;
 }
 .product-copy footer .product-price{
   min-width:0;
@@ -339,14 +340,14 @@ button,a,label{touch-action:manipulation}
   white-space:nowrap;
 }
 .product-copy footer>span{
-  justify-self:end;
+  justify-self:start;
   align-self:end;
   flex:0 0 auto;
 }
 @media(max-width:700px){
   .product-copy footer{
-    grid-template-columns:minmax(0,1fr) 30px;
-    gap:8px;
+    grid-template-columns:max-content 30px;
+    gap:9px;
     min-height:36px;
   }
   .product-price small{font-size:8px}
