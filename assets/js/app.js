@@ -347,7 +347,7 @@
       const category = catalog.categories.find(item => item.id === product.categoryId) || {};
       const imageUrl = product.imageUrl || category.imageUrl || '';
       const freeShipping = product.freeShippingEnabled === true ? String(product.freeShippingText || 'Entrega grátis').trim() : '';
-      const helmetIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14a8 8 0 0 1 16 0v2H4z"/><path d="M3 16h18v3H3z"/><path d="M12 6v8"/></svg>';
+      const helmetIcon = '<img src="assets/images/icone-capacete-entrega-gratis.svg" alt="" aria-hidden="true">';
       return '<article class="product-card"><button type="button" data-product="' + escape(product.id) + '">' +
         '<div class="product-copy"><small>' + escape(category.name || 'Açaí do Bom') + '</small><h3>' + escape(product.name) + '</h3><p>' + escape(product.description) + '</p>' +
         (freeShipping ? '<em class="free-shipping">' + helmetIcon + escape(freeShipping) + '</em>' : '') +
