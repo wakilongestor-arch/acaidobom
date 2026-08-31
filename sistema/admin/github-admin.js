@@ -1168,7 +1168,7 @@
   function openEditor(id) {
     editing = id
       ? structuredClone(catalog.products.find(product => product.id === id))
-      : { id: crypto.randomUUID(), name: '', description: '', categoryId: catalog.categories[0]?.id || 'destaques', price: 0, imageUrl: '', featured: false, active: true, badge: '', freeShippingEnabled: false, freeShippingText: 'Entrega grátis', addonGroups: [] };
+      : { id: crypto.randomUUID(), name: '', description: '', categoryId: catalog.categories[0]?.id || 'destaques', price: 0, imageUrl: '', featured: false, active: true, badge: '', freeShippingEnabled: false, freeShippingText: 'Entrega grátis', freeShippingIconUrl: '', addonGroups: [] };
     editing.addonGroups = editing.addonGroups || [];
     $('#editor-title').textContent = editing.name || 'Novo produto';
     $('#edit-name').value = editing.name;
@@ -1177,11 +1177,13 @@
     $('#edit-badge').value = editing.badge || '';
     $('#edit-free-shipping-enabled').checked = editing.freeShippingEnabled === true;
     $('#edit-free-shipping').value = editing.freeShippingText || 'Entrega grátis';
+    $('#edit-free-shipping-icon').value = editing.freeShippingIconUrl || '';
     $('#edit-image').value = editing.imageUrl || '';
     $('#edit-active').checked = editing.active;
     $('#edit-featured').checked = editing.featured;
     $('#edit-category').innerHTML = catalog.categories.map(category => `<option value="${esc(category.id)}" ${editing.categoryId === category.id ? 'selected' : ''}>${esc(`${category.emoji} ${category.name}`)}</option>`).join('');
     renderProductPhoto();
+    renderFreeShippingIcon();
     renderGroups();
     editorDirty = false;
     editorUploadCount = 0;
@@ -1210,6 +1212,13 @@
   function renderProductPhoto() {
     $('#product-photo').innerHTML = editing?.imageUrl ? `<img src="${esc(preview(editing.imageUrl))}">` : '⬡';
     $('#remove-product-image').hidden = !editing?.imageUrl;
+  }
+
+  function renderFreeShippingIcon() {
+    const previewBox = $('#shipping-icon-preview');
+    const iconUrl = editing?.freeShippingIconUrl || '';
+    previewBox.innerHTML = iconUrl ? `<img src="${esc(preview(iconUrl))}" alt="Ícone da entrega grátis">` : '⛑';
+    $('#remove-free-shipping-icon').hidden = !iconUrl;
   }
 
   function renderGroups() {
@@ -1263,7 +1272,7 @@
     const file = input.files[0];
     if (!file) return;
     const holder = input.closest('label');
-    const belongsToProduct = Boolean(editing && (target === 'product' || target === 'option'));
+    const belongsToProduct = Boolean(editing && (target === 'product' || target === 'option' || target === 'freeShippingIcon'));
     if (belongsToProduct) {
       editorUploadCount += 1;
       updateEditorState();
@@ -1272,7 +1281,7 @@
     holder?.classList.add('busy');
     try {
       notice('Otimizando e enviando imagem...');
-      const folders = { logo: 'logo', banner: 'banner', favicon: 'favicon', product: 'produtos', category: 'categorias', option: 'acompanhamentos', notification: 'mensagens', infoIcon: 'icones', offer: 'ofertas' };
+      const folders = { logo: 'logo', banner: 'banner', favicon: 'favicon', product: 'produtos', category: 'categorias', option: 'acompanhamentos', freeShippingIcon: 'icones-entrega', notification: 'mensagens', infoIcon: 'icones', offer: 'ofertas' };
       const url = await SupabaseStore.uploadImage(file, folders[target] || 'geral');
       if (target === 'logo') { catalog.settings.logoUrl = url; $('#logo-url').value = url; }
       if (target === 'banner') { catalog.settings.bannerUrl = url; $('#banner-url').value = url; }
@@ -1286,6 +1295,7 @@
         renderInfoIcons();
       }
       if (target === 'product' && editing) { editing.imageUrl = url; $('#edit-image').value = url; renderProductPhoto(); markEditorDirty(); }
+      if (target === 'freeShippingIcon' && editing) { editing.freeShippingIconUrl = url; $('#edit-free-shipping-icon').value = url; renderFreeShippingIcon(); markEditorDirty(); }
       if (target === 'category') {
         const category = catalog.categories.find(item => item.id === referenceId);
         if (category) category.imageUrl = url;
@@ -1491,6 +1501,7 @@
       editing.badge = $('#edit-badge').value.trim();
       editing.freeShippingEnabled = $('#edit-free-shipping-enabled').checked;
       editing.freeShippingText = $('#edit-free-shipping').value.trim() || 'Entrega grátis';
+      editing.freeShippingIconUrl = $('#edit-free-shipping-icon').value.trim();
       editing.imageUrl = $('#edit-image').value.trim();
       editing.active = $('#edit-active').checked;
       editing.featured = $('#edit-featured').checked;
@@ -1557,12 +1568,20 @@
     $('#favicon-url').oninput = event => { catalog.settings.faviconUrl = event.target.value; renderPreviews(); };
     $('#daily-offer-image').oninput = event => { catalog.settings.dailyOffer.imageUrl = event.target.value.trim(); renderPreviews(); };
     $('#edit-image').oninput = event => { if (editing) { editing.imageUrl = event.target.value; renderProductPhoto(); } };
+    $('#edit-free-shipping-icon').oninput = event => { if (editing) { editing.freeShippingIconUrl = event.target.value.trim(); renderFreeShippingIcon(); markEditorDirty(); } };
     $('#remove-product-image').onclick = () => {
       if (!editing) return;
       editing.imageUrl = '';
       $('#edit-image').value = '';
       markEditorDirty();
       renderProductPhoto();
+    };
+    $('#remove-free-shipping-icon').onclick = () => {
+      if (!editing) return;
+      editing.freeShippingIconUrl = '';
+      $('#edit-free-shipping-icon').value = '';
+      markEditorDirty();
+      renderFreeShippingIcon();
     };
     $('#toggle-make-webhook').onclick = () => {
       const input = $('#make-webhook-url');
