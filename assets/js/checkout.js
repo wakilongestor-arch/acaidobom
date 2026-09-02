@@ -259,6 +259,11 @@
       const quote = deliveryQuote(data);
       if (quote.blocked) message = quote.message;
     }
+    if (step === 3 && data.paymentMethod === 'cash' && data.changeNeeded === 'yes') {
+      const changeValue = Number(String(data.changeFor || '').replace(/[^\d,.-]/g, '').replace(',', '.'));
+      const total = CartStore.subtotal() + deliveryQuote(data).fee;
+      if (!Number.isFinite(changeValue) || changeValue <= total) message = `Informe um valor para troco maior que ${MenuAPI.money(total)}.`;
+    }
     if (message) {
       error.textContent = message;
       error.hidden = false;
@@ -272,7 +277,7 @@
     const methods = mercadoPagoEnabled
       ? [
           ['mercadopago_pix', 'Pix Mercado Pago', 'Abra o Mercado Pago e gere o QR Code'],
-          ['mercadopago_card', 'Cartão Mercado Pago', 'Crédito ou débito em ambiente seguro'],
+          ['mercadopago_card', 'Cartão Mercado Pago', 'Abrir direto no pagamento com crédito ou débito'],
           ['card_delivery', 'Cartão na entrega', 'Pague na maquininha'],
           ['cash', 'Dinheiro', 'Informe se precisa de troco']
         ]
@@ -299,8 +304,17 @@
       `<label class="payment-option"><input type="radio" name="paymentMethod" value="${value}" ${value === current ? 'checked' : ''}>${media[value] || ''}<span class="payment-copy"><b>${label}</b><small>${description}</small></span><i aria-hidden="true"></i></label>`
     ).join('');
     $('#payment-options').querySelectorAll('input').forEach(input => {
-      input.addEventListener('change', () => { $('#change-field').hidden = input.value !== 'cash'; });
+      input.addEventListener('change', () => {
+        const cash = input.value === 'cash';
+        $('#change-field').hidden = !cash;
+        if (!cash) {
+          $('#change-amount').hidden = true;
+          const noChange = $('#checkout-form').querySelector('input[name="changeNeeded"][value="no"]');
+          if (noChange) noChange.checked = true;
+        }
+      });
     });
+    $('#change-field').hidden = current !== 'cash';
   }
 
   function renderSummary() {
@@ -337,7 +351,7 @@
       `<section><header><b>Seus dados</b><button type="button" data-review-step="1">Corrigir</button></header><p>${escapeHtml(data.name)} · ${escapeHtml(data.phone)}<br><strong>${escapeHtml(data.email)}</strong></p></section>` +
       `<section><header><b>${data.fulfillment === 'pickup' ? 'Retirada' : 'Endereço de entrega'}</b><button type="button" data-review-step="2">Corrigir</button></header><p>${address}</p></section>` +
       `<section><header><b>Pedido</b><button type="button" data-review-step="3">Corrigir</button></header>${items}<div class="review-total"><span>Subtotal</span><b>${MenuAPI.money(CartStore.subtotal())}</b></div><div class="review-total"><span>Entrega</span><b>${MenuAPI.money(quote.fee)}</b></div><div class="review-total grand"><span>Total</span><b>${MenuAPI.money(CartStore.subtotal() + quote.fee)}</b></div></section>` +
-      `<section class="review-payment"><header><b>Pagamento escolhido</b><button type="button" data-review-step="3">Corrigir</button></header><p>${escapeHtml(paymentName(data.paymentMethod))}</p>${['mercadopago_pix', 'mercadopago_card'].includes(data.paymentMethod) ? '<small>O pedido só será enviado à loja após o Mercado Pago aprovar o pagamento.</small>' : ''}</section>`;
+      `<section class="review-payment"><header><b>Pagamento escolhido</b><button type="button" data-review-step="3">Corrigir</button></header><p>${escapeHtml(paymentName(data.paymentMethod))}${data.paymentMethod === 'cash' ? `<br>${data.changeNeeded === 'yes' ? `Troco para ${escapeHtml(data.changeFor)}` : 'Não precisa de troco'}` : ''}</p>${['mercadopago_pix', 'mercadopago_card'].includes(data.paymentMethod) ? '<small>O pedido só será enviado à loja após o Mercado Pago aprovar o pagamento.</small>' : ''}</section>`;
     $('#checkout-submit').textContent = onlinePayment
       ? `Confirmar e pagar · ${MenuAPI.money(CartStore.subtotal() + quote.fee)}`
       : `Confirmar pedido · ${MenuAPI.money(CartStore.subtotal() + quote.fee)}`;
@@ -412,7 +426,7 @@
         mapUrl: data.latitude && data.longitude ? `https://www.google.com/maps?q=${encodeURIComponent(data.latitude)},${encodeURIComponent(data.longitude)}` : ''
       },
       paymentMethod: data.paymentMethod || 'pix',
-      changeFor: data.changeFor || '',
+      changeFor: data.paymentMethod === 'cash' && data.changeNeeded === 'yes' ? (data.changeFor || '') : '',
       isReservation,
       reservationAt: isReservation ? data.reservationAt : '',
       notes: isReservation
@@ -609,6 +623,12 @@
     });
     $('#checkout-form').addEventListener('submit', submit);
     $('#use-location').addEventListener('click', useCurrentLocation);
+    document.querySelectorAll('input[name="changeNeeded"]').forEach(input => {
+      input.addEventListener('change', () => {
+        $('#change-amount').hidden = input.value !== 'yes';
+        if (input.value !== 'yes') $('#checkout-form').elements.namedItem('changeFor').value = '';
+      });
+    });
     const phone = $('#checkout-form').elements.namedItem('phone');
     phone.addEventListener('input', () => {
       clearTimeout(phoneTimer);

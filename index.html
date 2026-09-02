@@ -35,7 +35,7 @@
   {"@context":"https://schema.org","@type":"Restaurant","name":"Açaí do Bom","url":"https://acaidobom.com.br/","logo":"https://acaidobom.com.br/assets/images/favicon/favicon-512.png","image":"https://acaidobom.com.br/assets/images/social/cardapio-acai-do-bom.jpg","telephone":"+556993817951","servesCuisine":["Açaí","Lanches","Pastéis"],"priceRange":"R$","address":{"@type":"PostalAddress","addressLocality":"Ji-Paraná","addressRegion":"RO","addressCountry":"BR"},"areaServed":{"@type":"City","name":"Ji-Paraná"},"hasMenu":"https://acaidobom.com.br/#cardapio"}
   </script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" href="assets/css/style.css?v=20260902-pix-rls-fix">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260902-card-change">
   <link rel="stylesheet" href="assets/css/theme-custom.css?v=20260831-selection-cart-v7">
   <link rel="stylesheet" href="assets/css/consent.css?v=20260830-bannerfix">
 </head>
@@ -145,7 +145,7 @@
         </div>
         <div class="checkout-step" data-step="3" hidden>
           <h3>Como deseja pagar?</h3><div class="payments" id="payment-options"></div>
-          <label class="field" id="change-field" hidden><span>Troco para quanto?</span><input name="changeFor" placeholder="Ex: R$ 100,00"></label>
+          <section class="change-panel" id="change-field" hidden><b>Precisa de troco?</b><div><label><input type="radio" name="changeNeeded" value="no" checked><span>Não preciso</span></label><label><input type="radio" name="changeNeeded" value="yes"><span>Sim, preciso</span></label></div><label class="field" id="change-amount" hidden><span>Troco para quanto?</span><input name="changeFor" inputmode="decimal" placeholder="Ex: R$ 100,00"></label></section>
           <label class="field"><span>Observações gerais</span><textarea name="notes"></textarea></label>
           <div class="reservation-fields" id="reservation-fields" hidden><div><small>LOJA FECHADA</small><h3>Reserve seu pedido</h3><p>Escolha quando deseja receber. A reserva só será válida após a confirmação da loja por e-mail.</p></div><label class="field"><span>Data e horário *</span><input id="reservation-at" name="reservationAt" type="datetime-local"></label></div>
           <div class="summary" id="order-summary"></div>
@@ -167,7 +167,7 @@
   <script src="assets/js/supabase-store.js?v=20260902-pix-rls-fix"></script>
   <script src="assets/js/api.js?v=20260902-payment-approval"></script>
   <script src="assets/js/cart.js?v=20260831-free-delivery"></script>
-  <script src="assets/js/checkout.js?v=20260902-pix-rls-fix"></script>
+  <script src="assets/js/checkout.js?v=20260902-card-change"></script>
   <script src="assets/js/app.js?v=20260902-min-price"></script>
 </body>
 </html>
