@@ -182,6 +182,14 @@
     return data || {};
   }
 
+  async function getPaymentStatus(orderId, orderNumber) {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { data, error } = await db.functions.invoke('payment-status', { body: { orderId, orderNumber } });
+    throwIfError(error, 'Não foi possível consultar o pagamento.');
+    return data || {};
+  }
+
   async function listOrders() {
     const db = getClient();
     if (!db) return [];
@@ -314,6 +322,7 @@
     createOrder,
     notifyOrder,
     notifyMetaPurchase,
+    getPaymentStatus,
     notifyOrderEmail,
     testMakeWebhook,
     createCheckout,

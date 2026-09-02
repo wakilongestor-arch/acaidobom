@@ -89,16 +89,17 @@ Deno.serve(async req => {
   const { data: order, error: orderError } = await db.from('orders').select('*').eq('id', orderId).single();
   if (orderError || !order) return json({ error: 'Pedido não encontrado.' }, 404);
   if (eventId !== order.order_number) return json({ error: 'Identificação do evento inválida.' }, 400);
+  if (order.payment_status !== 'pago') {
+    return json({ sent: false, configured: true, skipped: true, reason: 'payment_not_approved' }, 409);
+  }
 
   const customer = order.customer || {};
   if (customer.marketingConsent !== true) {
     return json({ sent: false, configured: true, skipped: true, reason: 'marketing_consent_required' });
   }
 
-  const createdAt = new Date(order.created_at).getTime();
-  if (!Number.isFinite(createdAt) || Date.now() - createdAt > 15 * 60 * 1000) {
-    return json({ error: 'O prazo para registrar esta compra expirou.' }, 403);
-  }
+  const paidAt = new Date(order.updated_at || order.created_at).getTime();
+  const eventTime = Number.isFinite(paidAt) ? paidAt : Date.now();
 
   const eventType = 'meta.purchase';
   let auditId = '';
@@ -140,10 +141,11 @@ Deno.serve(async req => {
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
   const email = compact(customer.email);
   const phone = normalizePhone(customer.phone);
-  const fbp = safeMetaCookie(body.fbp, '_fbp');
-  const fbc = safeMetaCookie(body.fbc, '_fbc');
-  const clientIp = requestIp(req);
-  const clientUserAgent = req.headers.get('user-agent') || '';
+  const fbp = safeMetaCookie(body.fbp || customer.fbp, '_fbp');
+  const fbc = safeMetaCookie(body.fbc || customer.fbc, '_fbc');
+  const serverConfirmed = body.confirmedBy === 'mercadopago_webhook';
+  const clientIp = serverConfirmed ? '' : requestIp(req);
+  const clientUserAgent = serverConfirmed ? '' : (req.headers.get('user-agent') || '');
 
   const userData: Record<string, unknown> = {};
   const hashedFields = {
@@ -167,7 +169,7 @@ Deno.serve(async req => {
   const metaPayload: Record<string, unknown> = {
     data: [{
       event_name: 'Purchase',
-      event_time: Math.floor(createdAt / 1000),
+      event_time: Math.floor(eventTime / 1000),
       event_id: eventId,
       event_source_url: safeSourceUrl(body.sourceUrl),
       action_source: 'website',

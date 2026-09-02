@@ -35,6 +35,95 @@ async function validSignature(req: Request, dataId: string, secret: string) {
   return timingSafeEqual(await hmacHex(secret, manifest), String(parts.v1));
 }
 
+async function sendGa4Purchase(db: any, order: any) {
+  const trackingConsent = order.customer?.trackingConsent || {};
+  if (trackingConsent.analytics !== true) {
+    return { sent: false, skipped: true, reason: 'analytics_consent_required' };
+  }
+
+  let measurementId = Deno.env.get('GA4_MEASUREMENT_ID') || '';
+  const apiSecret = Deno.env.get('GA4_API_SECRET') || '';
+  if (!measurementId) {
+    const { data: settings } = await db.from('catalogs').select('data').eq('id', 'settings').maybeSingle();
+    measurementId = String(settings?.data?.ga4Id || '');
+  }
+  if (!/^G-[A-Z0-9]+$/i.test(measurementId) || !apiSecret) {
+    return { sent: false, configured: false };
+  }
+
+  const eventType = 'ga4.purchase';
+  const { data: previous } = await db.from('order_webhook_events')
+    .select('id,status')
+    .eq('order_id', order.id)
+    .eq('event_type', eventType)
+    .eq('source_updated_at', order.created_at)
+    .maybeSingle();
+  if (previous?.status === 'enviado') return { sent: true, duplicate: true };
+
+  let auditId = previous?.id || crypto.randomUUID();
+  if (previous?.id) {
+    await db.from('order_webhook_events').update({
+      status: 'processando', error_message: '', updated_at: new Date().toISOString()
+    }).eq('id', auditId);
+  } else {
+    const { error: auditError } = await db.from('order_webhook_events').insert({
+      id: auditId,
+      order_id: order.id,
+      event_type: eventType,
+      source_updated_at: order.created_at,
+      status: 'processando'
+    });
+    if (auditError?.code === '23505') return { sent: false, duplicate: true, processing: true };
+    if (auditError) auditId = '';
+  }
+
+  const items = (Array.isArray(order.items) ? order.items : []).map((item: any, index: number) => ({
+    item_id: String(item.productId || item.id || index + 1),
+    item_name: String(item.name || 'Produto'),
+    price: Math.round((Number(item.unitTotal ?? item.basePrice) || 0) * 100) / 100,
+    quantity: Math.max(1, Number(item.quantity) || 1)
+  }));
+  const attribution = order.customer?.attribution?.last_touch || {};
+  const payload = {
+    client_id: String(order.id),
+    timestamp_micros: String(Date.now() * 1000),
+    events: [{
+      name: 'purchase',
+      params: {
+        transaction_id: order.order_number,
+        event_id: order.order_number,
+        currency: 'BRL',
+        value: Math.round((Number(order.total) || 0) * 100) / 100,
+        shipping: Math.round((Number(order.delivery_fee) || 0) * 100) / 100,
+        items,
+        order_source: String(attribution.source || ''),
+        order_medium: String(attribution.medium || ''),
+        order_campaign: String(attribution.campaign || ''),
+        engagement_time_msec: 1
+      }
+    }]
+  };
+
+  try {
+    const response = await fetch(`https://www.google-analytics.com/mp/collect?measurement_id=${encodeURIComponent(measurementId)}&api_secret=${encodeURIComponent(apiSecret)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`GA4 respondeu HTTP ${response.status}.`);
+    if (auditId) await db.from('order_webhook_events').update({
+      status: 'enviado', response_status: response.status, error_message: '', updated_at: new Date().toISOString()
+    }).eq('id', auditId);
+    return { sent: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao enviar a compra ao GA4.';
+    if (auditId) await db.from('order_webhook_events').update({
+      status: 'erro', error_message: message, updated_at: new Date().toISOString()
+    }).eq('id', auditId);
+    return { sent: false, error: message };
+  }
+}
+
 Deno.serve(async req => {
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405);
 
@@ -63,7 +152,7 @@ Deno.serve(async req => {
   if (!orderId) return json({ received: true, ignored: true, reason: 'order_missing' });
 
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const { data: order, error } = await db.from('orders').select('id,total,payment_status').eq('id', orderId).maybeSingle();
+  const { data: order, error } = await db.from('orders').select('*').eq('id', orderId).maybeSingle();
   if (error || !order) return json({ received: true, ignored: true, reason: 'order_not_found' });
 
   const chargedAmount = Number(mercadoPagoOrder.total_amount || 0);
@@ -80,12 +169,38 @@ Deno.serve(async req => {
     paymentStatuses.some((status: string) => ['refunded', 'charged_back'].includes(status));
   const nextPaymentStatus = paid ? 'pago' : refunded ? 'estornado' : 'pendente';
 
+  const paidAt = new Date().toISOString();
   await db.from('orders').update({
     payment_status: nextPaymentStatus,
     payment_provider: 'mercadopago',
     payment_reference: String(mercadoPagoOrder.id || dataId),
-    updated_at: new Date().toISOString()
+    updated_at: paidAt
   }).eq('id', order.id);
 
-  return json({ received: true, orderId: order.id, paymentStatus: nextPaymentStatus });
+  let conversions: Record<string, unknown> = {};
+  if (nextPaymentStatus === 'pago') {
+    const confirmedOrder = { ...order, payment_status: 'pago', payment_provider: 'mercadopago', updated_at: paidAt };
+    const metaResponse = await fetch(`${supabaseUrl}/functions/v1/meta-conversions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        orderId: order.id,
+        eventId: order.order_number,
+        confirmedBy: 'mercadopago_webhook',
+        sourceUrl: 'https://acaidobom.com.br/',
+        fbp: order.customer?.fbp || '',
+        fbc: order.customer?.fbc || ''
+      })
+    });
+    conversions = {
+      meta: await metaResponse.json().catch(() => ({ sent: false, status: metaResponse.status })),
+      ga4: await sendGa4Purchase(db, confirmedOrder)
+    };
+  }
+
+  return json({ received: true, orderId: order.id, paymentStatus: nextPaymentStatus, conversions });
 });

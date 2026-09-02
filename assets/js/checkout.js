@@ -5,12 +5,19 @@
   let lastRestoredPhone = '';
   let phoneTimer = null;
   let redirectTimer = null;
+  let paymentTimer = null;
   let reservationMode = false;
   const profileStorageKey = 'acai_customer_profiles_v1';
   const $ = selector => document.querySelector(selector);
   const escapeHtml = value => String(value || '').replace(/[&<>"']/g, character => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[character]);
+
+  function readCookie(name) {
+    const prefix = `${encodeURIComponent(name)}=`;
+    const cookie = document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith(prefix));
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : '';
+  }
 
   function normalizePhone(value) {
     return String(value || '').replace(/\D/g, '').slice(-11);
@@ -351,7 +358,9 @@
           marketing: false,
           decided: false
         },
-        attribution: window.MenuAttribution?.forOrder?.() || null
+        attribution: window.MenuAttribution?.forOrder?.() || null,
+        fbp: readCookie('_fbp'),
+        fbc: readCookie('_fbc')
       },
       fulfillment: data.fulfillment,
       address: {
@@ -389,6 +398,9 @@
       else removeProfile(payload.customer.phone);
       CartStore.clear();
       showSuccess(result, data.name, isReservation);
+      if (!isReservation && result.orderId && ['pix', 'card'].includes(result.paymentMode) && !result.paymentError) {
+        monitorPayment(result, payload);
+      }
       if (paymentWindow) {
         if (result.paymentUrl) paymentWindow.location.replace(result.paymentUrl);
         else paymentWindow.close();
@@ -406,6 +418,34 @@
     } finally {
       button.disabled = false;
     }
+  }
+
+  function monitorPayment(result, payload) {
+    clearTimeout(paymentTimer);
+    const startedAt = Date.now();
+    const check = async () => {
+      try {
+        const status = await window.SupabaseStore.getPaymentStatus(result.orderId, result.orderNumber);
+        if (status.paymentStatus === 'pago') {
+          const storageKey = `acai_purchase_tracked_${result.orderNumber}`;
+          if (localStorage.getItem(storageKey) !== '1') {
+            MenuAPI.trackConfirmedPurchase(payload, result.orderNumber);
+            localStorage.setItem(storageKey, '1');
+          }
+          const successBox = $('#order-success');
+          if (successBox && !successBox.querySelector('.payment-approved')) {
+            successBox.querySelector('.order-number')?.insertAdjacentHTML('afterend', '<div class="payment-approved">✓ Pagamento aprovado pelo Mercado Pago</div>');
+          }
+          return;
+        }
+      } catch (error) {
+        console.warn('Aguardando confirmação segura do pagamento.', error);
+      }
+      if (Date.now() - startedAt < 15 * 60 * 1000) {
+        paymentTimer = setTimeout(check, 4000);
+      }
+    };
+    paymentTimer = setTimeout(check, 3000);
   }
 
   function showSuccess(result, name, isReservation = false) {

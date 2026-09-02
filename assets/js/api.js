@@ -31,6 +31,7 @@
     const phone = String(settings.whatsapp || '').replace(/\D/g, '');
     return {
       orderNumber,
+      orderId: extra.orderId || '',
       note,
       stored,
       whatsappUrl: settings.autoOpenWhatsApp === true && phone ? `https://wa.me/${phone}?text=${encodeURIComponent(note)}` : '',
@@ -56,7 +57,7 @@
     if (window.SupabaseStore?.configured) {
       try {
         const saved = await window.SupabaseStore.createOrder(payload, orderNumber);
-        const eventId = trackOrder(payload, orderNumber);
+        trackOrderCreated(payload, orderNumber);
         const settings = window.ACAI_CATALOG?.settings || {};
         let notificationSent = false;
         let notificationError = '';
@@ -70,17 +71,6 @@
         let pixQrCodeBase64 = '';
         let pixTicketUrl = '';
         let paymentError = '';
-        const trackingConsent = window.MenuConsent?.get() || { marketing: false };
-        if (!payload.isReservation && saved?.id && payload.customer.marketingConsent === true && trackingConsent.marketing === true) {
-          try {
-            const metaConversion = await window.SupabaseStore.notifyMetaPurchase(saved.id, eventId);
-            if (metaConversion.sent !== true && metaConversion.skipped !== true && metaConversion.configured !== false) {
-              console.warn('Pedido salvo; a Meta não confirmou o evento de servidor.', metaConversion);
-            }
-          } catch (error) {
-            console.warn('Pedido salvo; Conversions API indisponível.', error);
-          }
-        }
         if (saved?.id) {
           try {
             const emailNotification = await window.SupabaseStore.notifyOrderEmail(saved.id, 'created');
@@ -129,6 +119,7 @@
           }
         }
         return orderResult(orderNumber, payload, true, {
+          orderId: saved?.id || '',
           notificationSent,
           notificationError,
           storeEmailSent,
@@ -228,8 +219,7 @@
     }
   }
 
-  function trackOrder(payload, orderNumber) {
-    const settings = window.ACAI_CATALOG?.settings || {};
+  function trackOrderCreated(payload, orderNumber) {
     const eventId = orderNumber;
     const consentState = window.MenuConsent?.get() || {};
     const checkoutMarketingConsent = payload.customer?.marketingConsent === true;
@@ -245,7 +235,7 @@
       quantity: Math.max(1, Number(item.quantity) || 1)
     }));
     window.dataLayer = window.dataLayer || [];
-    const eventName = payload.isReservation ? 'reservation_request' : 'purchase';
+    const eventName = payload.isReservation ? 'reservation_request' : 'order_created';
     window.dataLayer.push({
       event: eventName,
       transaction_id: orderNumber,
@@ -266,9 +256,6 @@
       items,
       ecommerce: { transaction_id: orderNumber, event_id: eventId, value, currency: 'BRL', items }
     });
-    if (!payload.isReservation && marketingConsent && !settings.gtmId && typeof window.fbq === 'function') {
-      window.fbq('track', 'Purchase', { value, currency: 'BRL' }, { eventID: eventId });
-    }
     if (window.__ACAI_DIRECT_GA4__ === true && consentState.analytics === true && typeof window.gtag === 'function') {
       window.gtag('event', eventName, {
         transaction_id: orderNumber,
@@ -289,6 +276,39 @@
       });
     }
     return eventId;
+  }
+
+  function trackConfirmedPurchase(payload, orderNumber) {
+    const settings = window.ACAI_CATALOG?.settings || {};
+    const consentState = window.MenuConsent?.get() || {};
+    const checkoutMarketingConsent = payload.customer?.marketingConsent === true;
+    const marketingConsent = checkoutMarketingConsent && consentState.marketing === true;
+    const attribution = payload.customer?.attribution?.last_touch || {};
+    const value = roundTrackingValue(payload.total);
+    const items = (Array.isArray(payload.items) ? payload.items : []).map(trackingItem);
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'purchase',
+      transaction_id: orderNumber,
+      event_id: orderNumber,
+      payment_confirmed: true,
+      marketing_consent: marketingConsent,
+      utm_source: attribution.source || '',
+      utm_medium: attribution.medium || '',
+      utm_campaign: attribution.campaign || '',
+      utm_content: attribution.content || '',
+      utm_term: attribution.term || '',
+      value,
+      currency: 'BRL',
+      items,
+      ecommerce: { transaction_id: orderNumber, event_id: orderNumber, value, currency: 'BRL', items }
+    });
+    if (marketingConsent && !settings.gtmId && typeof window.fbq === 'function') {
+      window.fbq('track', 'Purchase', { value, currency: 'BRL' }, { eventID: orderNumber });
+    }
+    if (window.__ACAI_DIRECT_GA4__ === true && consentState.analytics === true && typeof window.gtag === 'function') {
+      window.gtag('event', 'purchase', { transaction_id: orderNumber, event_id: orderNumber, value, currency: 'BRL', items });
+    }
   }
 
   function money(value) {
@@ -428,5 +448,5 @@
     activateTracking();
   }
 
-  window.MenuAPI = { loadCatalog, createOrder, money, buildNote, injectTracking, trackEcommerce };
+  window.MenuAPI = { loadCatalog, createOrder, money, buildNote, injectTracking, trackEcommerce, trackConfirmedPurchase };
 })();
