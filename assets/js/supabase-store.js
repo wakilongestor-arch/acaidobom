@@ -158,6 +158,16 @@
     return data || {};
   }
 
+  async function confirmOrderConversion(orderId, eventId) {
+    const db = getClient();
+    if (!db) throw new Error('Supabase não configurado.');
+    const { data, error } = await db.functions.invoke('confirmed-conversions', {
+      body: { orderId, eventId, sourceUrl: 'https://acaidobom.com.br/' }
+    });
+    throwIfError(error, 'O pedido foi confirmado, mas a conversão não pôde ser enviada.');
+    return data || {};
+  }
+
   async function notifyOrderEmail(orderId, event = 'created') {
     const db = getClient();
     if (!db) throw new Error('Supabase não configurado.');
@@ -334,6 +344,7 @@
     createOrder,
     notifyOrder,
     notifyMetaPurchase,
+    confirmOrderConversion,
     getPaymentStatus,
     notifyOrderEmail,
     testMakeWebhook,

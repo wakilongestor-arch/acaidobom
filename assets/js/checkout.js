@@ -514,11 +514,6 @@
       try {
         const status = await window.SupabaseStore.getPaymentStatus(result.orderId, result.orderNumber);
         if (status.paymentStatus === 'pago') {
-          const storageKey = `acai_purchase_tracked_${result.orderNumber}`;
-          if (localStorage.getItem(storageKey) !== '1') {
-            MenuAPI.trackConfirmedPurchase(payload, result.orderNumber);
-            localStorage.setItem(storageKey, '1');
-          }
           CartStore.clear();
           showSuccess({ ...result, paymentApproved: true, emailAutomationConfigured: true }, customerName, false);
           return;

@@ -236,7 +236,7 @@
       quantity: Math.max(1, Number(item.quantity) || 1)
     }));
     window.dataLayer = window.dataLayer || [];
-    const eventName = payload.isReservation ? 'reservation_request' : 'order_created';
+    const eventName = payload.isReservation ? 'reservation_request' : 'order_request';
     window.dataLayer.push({
       event: eventName,
       transaction_id: orderNumber,

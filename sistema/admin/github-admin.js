@@ -11,6 +11,7 @@
   let editorUploadCount = 0;
   let deleting = null;
   let deletingOrderIds = [];
+  let cancellingOrderId = '';
   let orderRefreshTimer = null;
   let knownOrderIds = new Set();
   const expandedOrderIds = new Set();
@@ -961,6 +962,14 @@
     const paymentSelect = $(`[data-payment-status="${CSS.escape(id)}"]`);
     let status = changes.status || statusSelect?.value || order.status;
     const paymentStatus = changes.paymentStatus || paymentSelect?.value || order.payment_status;
+    if (status === 'cancelado' && order.status !== 'cancelado' && changes.cancellationConfirmed !== true) {
+      if (statusSelect) statusSelect.value = order.status;
+      cancellingOrderId = String(id);
+      $('#order-cancel-message').textContent = `Cancelar ${order.order_number}? Se a loja não aceitar, nenhuma conversão de compra será enviada.`;
+      $('#confirm-order-cancel').hidden = false;
+      document.body.classList.add('dialog-open');
+      return;
+    }
     if (changes.paymentStatus === 'pago' && order.status === 'novo' && !changes.status) status = 'confirmado';
     if (status === order.status && paymentStatus === order.payment_status) return;
     const statusEvents = {
@@ -972,6 +981,15 @@
       const result = await SupabaseStore.updateOrder(id, status, paymentStatus, emailEvents);
       order.status = status;
       order.payment_status = paymentStatus;
+      let conversionFailed = false;
+      if (status === 'confirmado' && order.status !== 'cancelado') {
+        try {
+          await SupabaseStore.confirmOrderConversion(order.id, order.order_number);
+        } catch (conversionError) {
+          conversionFailed = true;
+          console.error('Pedido confirmado; conversão ficou pendente.', conversionError);
+        }
+      }
       (result.notifications || []).forEach(notification => {
         if (notification.ok && notification.result?.sent) order.customer_email_status = 'enviado';
         else if (!notification.ok) order.customer_email_status = 'erro';
@@ -980,7 +998,7 @@
       renderOrders();
       renderCustomers();
       const failedEmail = (result.notifications || []).some(notification => !notification.ok);
-      notice(failedEmail ? 'Pedido atualizado. O e-mail ficou pendente para revisão.' : 'Pedido atualizado e movido automaticamente no CRM.', failedEmail);
+      notice(failedEmail || conversionFailed ? 'Pedido confirmado. Alguma automação ficou pendente para revisão.' : 'Pedido atualizado e movido automaticamente no CRM.', failedEmail || conversionFailed);
     } catch (error) {
       notice(error.message, true);
     }
@@ -1642,6 +1660,18 @@
       document.body.classList.remove('dialog-open');
       deletingOrderIds = [];
     };
+    $('#keep-order').onclick = () => {
+      $('#confirm-order-cancel').hidden = true;
+      document.body.classList.remove('dialog-open');
+      cancellingOrderId = '';
+    };
+    $('#do-order-cancel').onclick = async () => {
+      const id = cancellingOrderId;
+      $('#confirm-order-cancel').hidden = true;
+      document.body.classList.remove('dialog-open');
+      cancellingOrderId = '';
+      if (id) await updateOrder(id, { status: 'cancelado', cancellationConfirmed: true });
+    };
     $('#do-order-delete').onclick = deleteSelectedOrder;
     $('#do-delete').onclick = async () => {
       const previous = catalog.products;
@@ -1688,7 +1718,8 @@
     $('#store-status-mode').onchange = updateLiveStoreStatus;
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
-      if (!$('#confirm-order-delete').hidden) $('#cancel-order-delete').click();
+      if (!$('#confirm-order-cancel').hidden) $('#keep-order').click();
+      else if (!$('#confirm-order-delete').hidden) $('#cancel-order-delete').click();
       else if (!$('#confirm-delete').hidden) $('#cancel-delete').click();
       else if (!$('#product-dialog').hidden) closeEditor();
     });

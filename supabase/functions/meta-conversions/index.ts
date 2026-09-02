@@ -89,8 +89,8 @@ Deno.serve(async req => {
   const { data: order, error: orderError } = await db.from('orders').select('*').eq('id', orderId).single();
   if (orderError || !order) return json({ error: 'Pedido não encontrado.' }, 404);
   if (eventId !== order.order_number) return json({ error: 'Identificação do evento inválida.' }, 400);
-  if (order.payment_status !== 'pago') {
-    return json({ sent: false, configured: true, skipped: true, reason: 'payment_not_approved' }, 409);
+  if (!['confirmado', 'preparando', 'saiu_entrega', 'concluido'].includes(order.status)) {
+    return json({ sent: false, configured: true, skipped: true, reason: 'order_not_confirmed' }, 409);
   }
 
   const customer = order.customer || {};
@@ -143,7 +143,7 @@ Deno.serve(async req => {
   const phone = normalizePhone(customer.phone);
   const fbp = safeMetaCookie(body.fbp || customer.fbp, '_fbp');
   const fbc = safeMetaCookie(body.fbc || customer.fbc, '_fbc');
-  const serverConfirmed = body.confirmedBy === 'mercadopago_webhook';
+  const serverConfirmed = ['mercadopago_webhook', 'crm_confirmation'].includes(body.confirmedBy);
   const clientIp = serverConfirmed ? '' : requestIp(req);
   const clientUserAgent = serverConfirmed ? '' : (req.headers.get('user-agent') || '');
 

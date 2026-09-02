@@ -188,31 +188,6 @@ Deno.serve(async req => {
     updated_at: paidAt
   }).eq('id', order.id);
 
-  let conversions: Record<string, unknown> = {};
-  if (becamePaid) {
-    const confirmedOrder = { ...order, payment_status: 'pago', payment_provider: 'mercadopago', updated_at: paidAt };
-    const metaResponse = await fetch(`${supabaseUrl}/functions/v1/meta-conversions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        apikey: serviceKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        orderId: order.id,
-        eventId: order.order_number,
-        confirmedBy: 'mercadopago_webhook',
-        sourceUrl: 'https://acaidobom.com.br/',
-        fbp: order.customer?.fbp || '',
-        fbc: order.customer?.fbc || ''
-      })
-    });
-    conversions = {
-      meta: await metaResponse.json().catch(() => ({ sent: false, status: metaResponse.status })),
-      ga4: await sendGa4Purchase(db, confirmedOrder)
-    };
-  }
-
   let notifications: Record<string, unknown> = {};
   if (becamePaid) {
     const functionHeaders = {
@@ -234,5 +209,5 @@ Deno.serve(async req => {
     };
   }
 
-  return json({ received: true, orderId: order.id, paymentStatus: nextPaymentStatus, conversions, notifications });
+  return json({ received: true, orderId: order.id, paymentStatus: nextPaymentStatus, conversions: {}, notifications });
 });

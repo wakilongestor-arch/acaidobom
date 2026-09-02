@@ -136,10 +136,11 @@
   </div>
   <div class="confirm" id="confirm-delete" hidden><div><h3>Excluir produto?</h3><p>Ele será removido após publicar as alterações.</p><footer><button id="cancel-delete">Cancelar</button><button id="do-delete">Excluir</button></footer></div></div>
   <div class="confirm" id="confirm-order-delete" hidden><div><h3>Excluir pedido?</h3><p id="order-delete-message">O pedido e o histórico de automações serão removidos definitivamente.</p><footer><button id="cancel-order-delete">Voltar</button><button id="do-order-delete">Excluir pedido</button></footer></div></div>
+  <div class="confirm" id="confirm-order-cancel" hidden><div><h3>Cancelar este pedido?</h3><p id="order-cancel-message">Confirme somente se a loja realmente não aceitará o pedido. Pedidos cancelados não registram conversão.</p><footer><button id="keep-order">Não, manter pedido</button><button id="do-order-cancel">Sim, cancelar</button></footer></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../../assets/js/supabase-config.js"></script>
-  <script src="../../assets/js/supabase-store.js?v=20260902-pix-rls-fix"></script>
-  <script src="github-admin.js?v=20260831-category-product-grid-v1"></script>
+  <script src="../../assets/js/supabase-store.js?v=20260902-confirmed-conversion"></script>
+  <script src="github-admin.js?v=20260902-confirmed-conversion"></script>
 </body>
 </html>

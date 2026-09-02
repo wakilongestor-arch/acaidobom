@@ -7,6 +7,7 @@
 :root{--brand:#620853;--brand-dark:#26011a;--accent:#fcd307;--white:#fff;--line:#62085322}
 body{background:#fff;color:var(--brand-dark)}
 body.dialog-open{overflow:hidden}
+#do-order-cancel{background:#c63142;color:#fff}
 .admin-layout>aside{background:var(--brand)!important}
 .admin-layout aside nav button.active,.admin-layout aside nav button:hover{background:var(--accent);color:var(--brand-dark)}
 .admin-layout aside nav button b{background:var(--accent);color:var(--brand-dark)}
