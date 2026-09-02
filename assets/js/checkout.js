@@ -269,7 +269,7 @@
     const mercadoPagoEnabled = window.SupabaseStore?.configured === true;
     const methods = mercadoPagoEnabled
       ? [
-          ['mercadopago_pix', 'Pix Mercado Pago', 'QR Code e Pix copia e cola'],
+          ['mercadopago_pix', 'Pix Mercado Pago', 'Abra o Mercado Pago e gere o QR Code'],
           ['mercadopago_card', 'Cartão Mercado Pago', 'Crédito ou débito em ambiente seguro'],
           ['card_delivery', 'Cartão na entrega', 'Pague na maquininha'],
           ['cash', 'Dinheiro', 'Informe se precisa de troco']
@@ -388,7 +388,7 @@
       whatsappWindow = window.open('', 'acai-pedido-whatsapp');
       if (whatsappWindow) whatsappWindow.document.title = 'Preparando pedido no WhatsApp';
     }
-    if (payload.paymentMethod === 'mercadopago_card') {
+    if (['mercadopago_card', 'mercadopago_pix'].includes(payload.paymentMethod)) {
       paymentWindow = window.open('', 'acai-pagamento-mercadopago');
       if (paymentWindow) paymentWindow.document.title = 'Abrindo pagamento seguro';
     }

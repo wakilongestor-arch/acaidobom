@@ -87,72 +87,49 @@ Deno.serve(async req => {
     'X-Idempotency-Key': idempotencyKey
   };
 
-  const payload = paymentMode === 'pix'
-    ? {
-        type: 'online',
-        processing_mode: 'automatic',
-        total_amount: money(order.total),
-        external_reference: order.id,
-        description: `Pedido ${order.order_number}`,
-        payer: {
-          email,
-          first_name: String(customer.name || '').trim().split(/\s+/)[0] || 'Cliente'
-        },
-        transactions: {
-          payments: [{
-            amount: money(order.total),
-            payment_method: { id: 'pix', type: 'bank_transfer' },
-            expiration_time: 'PT30M'
-          }]
-        },
-        config: { notification_url: notificationUrl }
-      }
-    : {
+  const preferenceItems = items.map((item: any, index: number) => ({
+    id: String(index + 1),
+    title: item.title,
+    quantity: item.quantity,
+    unit_price: Number(item.unit_price),
+    currency_id: 'BRL'
+  }));
+  const payload = {
         external_reference: order.id,
         notification_url: notificationUrl,
         statement_descriptor: 'ACAI DO BOM',
         payer: { email, name: String(customer.name || '').trim() },
-        items: items.map((item: any, index: number) => ({
-          id: String(index + 1),
-          title: item.title,
-          quantity: item.quantity,
-          unit_price: Number(item.unit_price),
-          currency_id: 'BRL'
-        })),
+        items: preferenceItems,
         back_urls: {
           success: `${returnUrl}aprovado`,
           pending: `${returnUrl}pendente`,
           failure: `${returnUrl}falhou`
         },
         auto_return: 'approved',
-        payment_methods: {
-          excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
-          installments: 10
-        }
+        payment_methods: paymentMode === 'pix'
+          ? {
+              excluded_payment_types: [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'ticket' }, { id: 'atm' }],
+              installments: 1
+            }
+          : {
+              excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
+              installments: 10
+            }
       };
 
-  const endpoint = paymentMode === 'pix'
-    ? 'https://api.mercadopago.com/v1/orders'
-    : 'https://api.mercadopago.com/checkout/preferences';
+  const endpoint = 'https://api.mercadopago.com/checkout/preferences';
   let response = await fetch(endpoint, {
     method: 'POST',
     headers: commonHeaders,
     body: JSON.stringify(payload)
   });
   let result = await response.json().catch(() => ({}));
-  if (!response.ok && paymentMode === 'card') {
-    const cardItems = items.map((item: any, index: number) => ({
-      id: String(index + 1),
-      title: item.title,
-      quantity: item.quantity,
-      unit_price: Number(item.unit_price),
-      currency_id: 'BRL'
-    }));
+  if (!response.ok) {
     response = await fetch(endpoint, {
       method: 'POST',
       headers: commonHeaders,
       body: JSON.stringify({
-        items: cardItems,
+        items: preferenceItems,
         payer: { email },
         external_reference: order.id,
         notification_url: notificationUrl,
@@ -161,7 +138,10 @@ Deno.serve(async req => {
           pending: `${returnUrl}pendente`,
           failure: `${returnUrl}falhou`
         },
-        auto_return: 'approved'
+        auto_return: 'approved',
+        payment_methods: paymentMode === 'pix'
+          ? { excluded_payment_types: [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'ticket' }, { id: 'atm' }], installments: 1 }
+          : undefined
       })
     });
     result = await response.json().catch(() => ({}));
@@ -171,25 +151,12 @@ Deno.serve(async req => {
     return json({ error: message }, response.status);
   }
 
-  let details = paymentDetails(result);
-  if (paymentMode === 'pix' && !details.qrCode && details.reference) {
-    const refreshed = await fetch(`https://api.mercadopago.com/v1/orders/${encodeURIComponent(details.reference)}`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (refreshed.ok) {
-      result = await refreshed.json().catch(() => result);
-      details = paymentDetails(result);
-    }
+  const details = paymentDetails(result);
+  if (!/^https:\/\//.test(details.checkoutUrl)) {
+    return json({ error: 'O Mercado Pago não retornou a página segura de pagamento.' }, 502);
   }
 
-  if (paymentMode === 'card' && !/^https:\/\//.test(details.checkoutUrl)) {
-    return json({ error: 'O Mercado Pago não retornou a URL segura do cartão.' }, 502);
-  }
-  if (paymentMode === 'pix' && !details.qrCode && !/^https:\/\//.test(details.ticketUrl)) {
-    return json({ error: 'O Mercado Pago ainda não retornou o QR Code do Pix. Tente novamente.' }, 502);
-  }
-
-  const checkoutUrl = paymentMode === 'card' ? details.checkoutUrl : details.ticketUrl;
+  const checkoutUrl = details.checkoutUrl;
   await db.from('orders').update({
     payment_method: paymentMode === 'pix' ? 'mercadopago_pix' : 'mercadopago_card',
     payment_provider: 'mercadopago',
