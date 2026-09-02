@@ -174,10 +174,10 @@
     return data || {};
   }
 
-  async function createCheckout(orderId, provider) {
+  async function createCheckout(orderId, paymentMode = 'card') {
     const db = getClient();
     if (!db) throw new Error('Supabase não configurado.');
-    const { data, error } = await db.functions.invoke('create-checkout', { body: { orderId, provider } });
+    const { data, error } = await db.functions.invoke('create-checkout', { body: { orderId, paymentMode } });
     throwIfError(error, 'O pedido foi salvo, mas o checkout não pôde ser criado.');
     return data || {};
   }

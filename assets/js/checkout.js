@@ -8,6 +8,9 @@
   let reservationMode = false;
   const profileStorageKey = 'acai_customer_profiles_v1';
   const $ = selector => document.querySelector(selector);
+  const escapeHtml = value => String(value || '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
 
   function normalizePhone(value) {
     return String(value || '').replace(/\D/g, '').slice(-11);
@@ -256,15 +259,25 @@
   }
 
   function renderPayments() {
-    const methods = [
-      ['pix', 'PIX', catalog.settings.pixKey ? 'Chave após confirmar' : 'Confirme com a loja'],
-      ['card_delivery', 'Cartão na entrega', 'Crédito ou débito'],
-      ['cash', 'Dinheiro', 'Informe se precisa de troco']
-    ];
-    if (catalog.settings.paymentLink || (catalog.settings.gatewayEnabled && catalog.settings.gatewayProvider !== 'none')) {
+    const mercadoPagoEnabled = window.SupabaseStore?.configured === true;
+    const methods = mercadoPagoEnabled
+      ? [
+          ['mercadopago_pix', 'Pix Mercado Pago', 'QR Code e Pix copia e cola'],
+          ['mercadopago_card', 'Cartão Mercado Pago', 'Crédito ou débito em ambiente seguro'],
+          ['card_delivery', 'Cartão na entrega', 'Pague na maquininha'],
+          ['cash', 'Dinheiro', 'Informe se precisa de troco']
+        ]
+      : [
+          ['pix', 'PIX', catalog.settings.pixKey ? 'Chave após confirmar' : 'Confirme com a loja'],
+          ['card_delivery', 'Cartão na entrega', 'Crédito ou débito'],
+          ['cash', 'Dinheiro', 'Informe se precisa de troco']
+        ];
+    if (!mercadoPagoEnabled && (catalog.settings.paymentLink || (catalog.settings.gatewayEnabled && catalog.settings.gatewayProvider !== 'none'))) {
       methods.push(['payment_link', 'Pagamento on-line', 'Link seguro']);
     }
-    const current = document.querySelector('input[name=paymentMethod]:checked')?.value || 'pix';
+    const fallback = mercadoPagoEnabled ? 'mercadopago_pix' : 'pix';
+    const selected = document.querySelector('input[name=paymentMethod]:checked')?.value;
+    const current = methods.some(([value]) => value === selected) ? selected : fallback;
     $('#payment-options').innerHTML = methods.map(([value, label, description]) =>
       `<label><input type="radio" name="paymentMethod" value="${value}" ${value === current ? 'checked' : ''}><span><b>${label}</b><small>${description}</small></span></label>`
     ).join('');
@@ -361,9 +374,14 @@
       total: CartStore.subtotal() + delivery
     };
     let whatsappWindow = null;
+    let paymentWindow = null;
     if (catalog.settings.autoOpenWhatsApp !== false && !catalog.settings.whatsappCloudEnabled) {
       whatsappWindow = window.open('', 'acai-pedido-whatsapp');
       if (whatsappWindow) whatsappWindow.document.title = 'Preparando pedido no WhatsApp';
+    }
+    if (payload.paymentMethod === 'mercadopago_card') {
+      paymentWindow = window.open('', 'acai-pagamento-mercadopago');
+      if (paymentWindow) paymentWindow.document.title = 'Abrindo pagamento seguro';
     }
     try {
       const result = await MenuAPI.createOrder(payload);
@@ -371,12 +389,17 @@
       else removeProfile(payload.customer.phone);
       CartStore.clear();
       showSuccess(result, data.name, isReservation);
+      if (paymentWindow) {
+        if (result.paymentUrl) paymentWindow.location.replace(result.paymentUrl);
+        else paymentWindow.close();
+      }
       if (whatsappWindow) {
         if (result.whatsappUrl) whatsappWindow.location.replace(result.whatsappUrl);
         else whatsappWindow.close();
       }
     } catch (error) {
       whatsappWindow?.close();
+      paymentWindow?.close();
       const box = $('#checkout-error');
       box.textContent = error.message || 'Não foi possível concluir o pedido.';
       box.hidden = false;
@@ -402,18 +425,38 @@
       : '';
     const redirectUrl = catalog.settings.orderRedirectEnabled ? safeRedirectUrl(catalog.settings.orderRedirectUrl) : '';
     const redirectNotice = redirectUrl ? '<div class="redirect-confirmation">Você será direcionado para a próxima página em alguns segundos.</div>' : '';
+    const safeQrImage = /^[A-Za-z0-9+/=\r\n]+$/.test(String(result.pixQrCodeBase64 || ''))
+      ? String(result.pixQrCodeBase64).replace(/\s/g, '')
+      : '';
+    const pixPayment = result.paymentMode === 'pix' && (result.pixQrCode || result.pixTicketUrl)
+      ? `<section class="mercadopago-pix"><span class="mp-badge">PIX MERCADO PAGO</span>` +
+        `<h3>Escaneie para pagar</h3><p>Abra o aplicativo do seu banco e pague o valor exato do pedido.</p>` +
+        (safeQrImage ? `<img src="data:image/png;base64,${safeQrImage}" alt="QR Code Pix do pedido">` : '') +
+        (result.pixQrCode ? `<label>Pix copia e cola</label><div class="pix-copy"><input value="${escapeHtml(result.pixQrCode)}" readonly><button type="button" data-copy-mp-pix>Copiar Pix</button></div>` : '') +
+        (result.pixTicketUrl ? `<a href="${escapeHtml(result.pixTicketUrl)}" target="_blank" rel="noopener">Abrir Pix no Mercado Pago</a>` : '') +
+        `<small>O pagamento será confirmado automaticamente após a transferência.</small></section>`
+      : '';
+    const paymentError = result.paymentError
+      ? `<div class="payment-error"><b>O pedido foi salvo, mas o pagamento não abriu.</b><span>${escapeHtml(result.paymentError)}</span><small>Não faça outro pedido. Informe o número acima à loja.</small></div>`
+      : '';
     box.innerHTML = `<span class="success-icon">✓</span><small>${title}</small>` +
       `<h2>Obrigado ${String(name).split(' ')[0]}!</h2><p>${message}</p>` +
       `<div class="order-number"><small>NÚMERO DO PEDIDO</small><b>${result.orderNumber}</b></div>` +
       emailNotice +
       redirectNotice +
+      paymentError +
+      pixPayment +
       (result.pixKey ? `<div class="pix"><span><small>CHAVE PIX</small><b>${result.pixKey}</b></span><button type="button" data-copy-pix>Copiar</button></div>` : '') +
       '<div class="success-links">' +
-      (result.paymentUrl ? `<a href="${result.paymentUrl}" target="_blank" rel="noopener">Pagar on-line</a>` : '') +
+      (result.paymentUrl ? `<a href="${escapeHtml(result.paymentUrl)}" target="_blank" rel="noopener">Pagar on-line</a>` : '') +
       (catalog.settings.autoOpenWhatsApp === true && result.whatsappUrl ? `<a class="wa" href="${result.whatsappUrl}" target="_blank" rel="noopener">Enviar pedido pelo WhatsApp</a>` : '') +
       (redirectUrl ? `<a class="redirect-link" href="${redirectUrl}">Continuar →</a>` : '') +
       '</div><button type="button" class="link-button" data-finish>Voltar ao cardápio</button>';
     box.querySelector('[data-copy-pix]')?.addEventListener('click', () => navigator.clipboard.writeText(result.pixKey));
+    box.querySelector('[data-copy-mp-pix]')?.addEventListener('click', async event => {
+      await navigator.clipboard.writeText(result.pixQrCode);
+      event.currentTarget.textContent = 'Copiado!';
+    });
     box.querySelector('[data-finish]').addEventListener('click', close);
     if (redirectUrl) {
       clearTimeout(redirectTimer);

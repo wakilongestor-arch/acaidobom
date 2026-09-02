@@ -680,7 +680,8 @@
 
   function paymentLabel(method) {
     return ({
-      pix: 'PIX', card_delivery: 'Cartão na entrega', cash: 'Dinheiro',
+      pix: 'PIX', mercadopago_pix: 'PIX pelo Mercado Pago', mercadopago_card: 'Cartão pelo Mercado Pago',
+      card_delivery: 'Cartão na entrega', cash: 'Dinheiro',
       payment_link: 'Pagamento on-line'
     })[method] || method || 'Não informado';
   }
@@ -834,8 +835,12 @@
       const driverButton = driverDeliveryButton(order);
       const paymentClass = order.payment_status === 'pago' ? 'paid' : order.payment_status === 'estornado' ? 'refunded' : 'pending';
       const rawChangeFor = Number(String(order.change_for || '').replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0;
-      const paymentMethodText = order.payment_provider === 'mercadopago' || order.payment_method === 'payment_link'
-        ? 'Mercado Pago'
+      const paymentMethodText = order.payment_method === 'mercadopago_pix'
+        ? 'PIX pelo Mercado Pago'
+        : order.payment_method === 'mercadopago_card'
+          ? 'Cartão pelo Mercado Pago'
+          : order.payment_provider === 'mercadopago' || order.payment_method === 'payment_link'
+            ? 'Mercado Pago'
         : paymentLabel(order.payment_method);
       const deliveryPaymentNotice = order.payment_status === 'pago'
         ? '<span class="receipt-payment-note paid">✓ Pago pelo Mercado Pago · não cobrar</span>'

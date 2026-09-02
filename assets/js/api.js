@@ -35,8 +35,14 @@
       stored,
       whatsappUrl: settings.autoOpenWhatsApp === true && phone ? `https://wa.me/${phone}?text=${encodeURIComponent(note)}` : '',
       customerEmail: payload.customer.email || '',
-      pixKey: settings.pixKey || '',
+      pixKey: payload.paymentMethod === 'pix' ? (settings.pixKey || '') : '',
       paymentUrl: extra.paymentUrl || (payload.paymentMethod === 'payment_link' ? (settings.paymentLink || '') : ''),
+      paymentMode: extra.paymentMode || '',
+      paymentReference: extra.paymentReference || '',
+      pixQrCode: extra.pixQrCode || '',
+      pixQrCodeBase64: extra.pixQrCodeBase64 || '',
+      pixTicketUrl: extra.pixTicketUrl || '',
+      paymentError: extra.paymentError || '',
       notificationSent: Boolean(extra.notificationSent),
       notificationError: extra.notificationError || '',
       storeEmailSent: Boolean(extra.storeEmailSent),
@@ -58,6 +64,12 @@
         let emailAutomationConfigured = false;
         let emailNotificationError = '';
         let paymentUrl = '';
+        let paymentMode = '';
+        let paymentReference = '';
+        let pixQrCode = '';
+        let pixQrCodeBase64 = '';
+        let pixTicketUrl = '';
+        let paymentError = '';
         const trackingConsent = window.MenuConsent?.get() || { marketing: false };
         if (!payload.isReservation && saved?.id && payload.customer.marketingConsent === true && trackingConsent.marketing === true) {
           try {
@@ -88,9 +100,29 @@
             console.error('Pedido salvo; falha no WhatsApp Cloud API.', error);
           }
         }
-        if (payload.paymentMethod === 'payment_link' && settings.gatewayEnabled && settings.gatewayProvider !== 'none' && saved?.id) {
+        const mercadoPagoMode = payload.paymentMethod === 'mercadopago_pix'
+          ? 'pix'
+          : payload.paymentMethod === 'mercadopago_card'
+            ? 'card'
+            : '';
+        if (mercadoPagoMode && saved?.id) {
           try {
-            const checkout = await window.SupabaseStore.createCheckout(saved.id, settings.gatewayProvider);
+            const checkout = await window.SupabaseStore.createCheckout(saved.id, mercadoPagoMode);
+            paymentMode = checkout.paymentMode || mercadoPagoMode;
+            paymentReference = checkout.reference || '';
+            paymentUrl = checkout.checkoutUrl || '';
+            pixQrCode = checkout.qrCode || '';
+            pixQrCodeBase64 = checkout.qrCodeBase64 || '';
+            pixTicketUrl = checkout.ticketUrl || '';
+          } catch (error) {
+            console.error('Pedido salvo; falha ao criar checkout.', error);
+            paymentError = error.message || 'O Mercado Pago não criou o pagamento.';
+          }
+        } else if (payload.paymentMethod === 'payment_link' && settings.gatewayEnabled && settings.gatewayProvider !== 'none' && saved?.id) {
+          try {
+            const checkout = await window.SupabaseStore.createCheckout(saved.id, 'card');
+            paymentMode = checkout.paymentMode || 'card';
+            paymentReference = checkout.reference || '';
             paymentUrl = checkout.checkoutUrl || '';
           } catch (error) {
             console.error('Pedido salvo; falha ao criar checkout.', error);
@@ -102,7 +134,13 @@
           storeEmailSent,
           emailAutomationConfigured,
           emailNotificationError,
-          paymentUrl
+          paymentUrl,
+          paymentMode,
+          paymentReference,
+          pixQrCode,
+          pixQrCodeBase64,
+          pixTicketUrl,
+          paymentError
         });
       } catch (error) {
         console.error('Pedido não salvo no Supabase.', error);
@@ -261,6 +299,8 @@
   function buildNote(number, payload) {
     const paymentNames = {
       pix: 'PIX',
+      mercadopago_pix: 'PIX pelo Mercado Pago',
+      mercadopago_card: 'Cartão pelo Mercado Pago',
       card_delivery: 'Cartão na entrega',
       cash: 'Dinheiro',
       payment_link: 'Pagamento on-line'

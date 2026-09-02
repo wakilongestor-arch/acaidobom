@@ -100,8 +100,8 @@
     }
   },
   "whatsappCloudEnabled": false,
-  "gatewayEnabled": false,
-  "gatewayProvider": "none",
+  "gatewayEnabled": true,
+  "gatewayProvider": "mercadopago",
   "metaPixelId": "",
   "gtmId": "",
   "ga4Id": ""

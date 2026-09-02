@@ -8,7 +8,9 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 function timingSafeEqual(left: string, right: string) {
   if (left.length !== right.length) return false;
   let difference = 0;
-  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
   return difference === 0;
 }
 
@@ -46,41 +48,42 @@ Deno.serve(async req => {
 
   const url = new URL(req.url);
   const body = await req.json().catch(() => ({}));
-  const type = String(url.searchParams.get('type') || body.type || body.action || '');
+  const type = String(url.searchParams.get('type') || body.type || '').toLowerCase();
   const dataId = String(url.searchParams.get('data.id') || url.searchParams.get('data_id') || body?.data?.id || '');
-  if (!dataId || (!type.includes('payment') && body.type !== 'payment')) return json({ received: true, ignored: true });
-
+  if (!dataId || type !== 'order') return json({ received: true, ignored: true });
   if (!(await validSignature(req, dataId, webhookSecret))) return json({ error: 'Assinatura inválida.' }, 401);
 
-  const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(dataId)}`, {
+  const orderResponse = await fetch(`https://api.mercadopago.com/v1/orders/${encodeURIComponent(dataId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
-  const payment = await paymentResponse.json().catch(() => ({}));
-  if (!paymentResponse.ok) return json({ error: 'Não foi possível confirmar o pagamento no Mercado Pago.' }, 502);
+  const mercadoPagoOrder = await orderResponse.json().catch(() => ({}));
+  if (!orderResponse.ok) return json({ error: 'Não foi possível confirmar a order no Mercado Pago.' }, 502);
 
-  const orderId = String(payment.external_reference || payment.metadata?.order_id || '');
+  const orderId = String(mercadoPagoOrder.external_reference || '');
   if (!orderId) return json({ received: true, ignored: true, reason: 'order_missing' });
 
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { data: order, error } = await db.from('orders').select('id,total,payment_status').eq('id', orderId).maybeSingle();
   if (error || !order) return json({ received: true, ignored: true, reason: 'order_not_found' });
 
-  const paidAmount = Number(payment.transaction_amount || 0);
-  if (Math.abs(paidAmount - Number(order.total || 0)) > 0.01) {
-    return json({ error: 'Valor do pagamento não confere com o pedido.' }, 409);
+  const chargedAmount = Number(mercadoPagoOrder.total_amount || 0);
+  if (Math.abs(chargedAmount - Number(order.total || 0)) > 0.01) {
+    return json({ error: 'O valor da order não confere com o pedido.' }, 409);
   }
 
-  const status = String(payment.status || '');
-  const nextPaymentStatus = status === 'approved'
-    ? 'pago'
-    : ['refunded', 'charged_back'].includes(status)
-      ? 'estornado'
-      : 'pendente';
+  const orderStatus = String(mercadoPagoOrder.status || '').toLowerCase();
+  const paymentStatuses = (mercadoPagoOrder?.transactions?.payments || [])
+    .map((payment: any) => String(payment.status || '').toLowerCase());
+  const paid = ['processed', 'accredited', 'approved'].includes(orderStatus) ||
+    paymentStatuses.some((status: string) => ['processed', 'accredited', 'approved'].includes(status));
+  const refunded = ['refunded', 'charged_back'].includes(orderStatus) ||
+    paymentStatuses.some((status: string) => ['refunded', 'charged_back'].includes(status));
+  const nextPaymentStatus = paid ? 'pago' : refunded ? 'estornado' : 'pendente';
 
   await db.from('orders').update({
     payment_status: nextPaymentStatus,
     payment_provider: 'mercadopago',
-    payment_reference: String(payment.id || dataId),
+    payment_reference: String(mercadoPagoOrder.id || dataId),
     updated_at: new Date().toISOString()
   }).eq('id', order.id);
 
