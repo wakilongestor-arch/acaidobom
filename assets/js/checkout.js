@@ -288,11 +288,11 @@
     const selected = document.querySelector('input[name=paymentMethod]:checked')?.value;
     const current = methods.some(([value]) => value === selected) ? selected : fallback;
     const media = {
-      mercadopago_pix: '<span class="payment-brand pix-brand"><img src="assets/images/payments/pix.png" alt="Pix"><em>PIX</em></span>',
+      mercadopago_pix: '<span class="payment-brand pix-brand"><img src="assets/images/payments/pix.png" alt="Pix"></span>',
       mercadopago_card: '<span class="payment-brand mp-brand"><img src="assets/images/payments/mercado-pago.png" alt="Mercado Pago"></span>',
       card_delivery: '<span class="payment-brand payment-emoji" aria-hidden="true">💳</span>',
       cash: '<span class="payment-brand payment-emoji" aria-hidden="true">💵</span>',
-      pix: '<span class="payment-brand pix-brand"><img src="assets/images/payments/pix.png" alt="Pix"><em>PIX</em></span>',
+      pix: '<span class="payment-brand pix-brand"><img src="assets/images/payments/pix.png" alt="Pix"></span>',
       payment_link: '<span class="payment-brand payment-emoji" aria-hidden="true">🔒</span>'
     };
     $('#payment-options').innerHTML = methods.map(([value, label, description]) =>
