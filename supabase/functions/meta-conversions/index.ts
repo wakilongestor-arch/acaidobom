@@ -94,7 +94,9 @@ Deno.serve(async req => {
   }
 
   const customer = order.customer || {};
-  if (customer.marketingConsent !== true) {
+  const checkoutMarketingConsent = customer.marketingConsent === true;
+  const cookieMarketingConsent = customer.trackingConsent?.marketing === true;
+  if (!checkoutMarketingConsent || !cookieMarketingConsent) {
     return json({ sent: false, configured: true, skipped: true, reason: 'marketing_consent_required' });
   }
 
