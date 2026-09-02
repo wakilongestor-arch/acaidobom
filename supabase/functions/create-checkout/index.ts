@@ -76,7 +76,7 @@ Deno.serve(async req => {
     return json({ error: 'Os valores do pedido não conferem. Volte ao cardápio e tente novamente.' }, 409);
   }
 
-  const notificationUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook`;
+  const notificationUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook?source_news=webhooks`;
   const returnUrl = 'https://acaidobom.com.br/?pagamento=';
   const idempotencyKey = paymentMode === 'card'
     ? order.id
