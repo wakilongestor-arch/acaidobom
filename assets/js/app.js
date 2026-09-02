@@ -555,9 +555,12 @@
     for (const group of productGroups()) {
       if (!validateGroup(group)) return;
     }
+    const selectedCategory = (catalog.categories || []).find(category => String(category.id) === String(selected.categoryId)) || {};
     const cartItem = {
       productId: selected.id,
       name: selected.name,
+      categoryId: selected.categoryId || '',
+      categoryName: selectedCategory.name || '',
       imageUrl: selected.imageUrl,
       basePrice: selected.price,
       quantity,
