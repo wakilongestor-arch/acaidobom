@@ -37,12 +37,13 @@ function checkoutItems(order: any) {
 function paymentDetails(result: any) {
   const payment = result?.transactions?.payments?.[0] || {};
   const method = payment.payment_method || {};
+  const transactionData = result?.point_of_interaction?.transaction_data || {};
   return {
     reference: String(result?.id || payment.id || ''),
-    checkoutUrl: String(result?.init_point || result?.sandbox_init_point || result?.checkout_url || ''),
-    ticketUrl: String(method.ticket_url || payment.ticket_url || ''),
-    qrCode: String(method.qr_code || payment.qr_code || ''),
-    qrCodeBase64: String(method.qr_code_base64 || payment.qr_code_base64 || '')
+    checkoutUrl: String(result?.init_point || result?.sandbox_init_point || result?.checkout_url || transactionData.ticket_url || ''),
+    ticketUrl: String(transactionData.ticket_url || method.ticket_url || payment.ticket_url || ''),
+    qrCode: String(transactionData.qr_code || method.qr_code || payment.qr_code || ''),
+    qrCodeBase64: String(transactionData.qr_code_base64 || method.qr_code_base64 || payment.qr_code_base64 || '')
   };
 }
 
@@ -87,6 +88,48 @@ Deno.serve(async req => {
     'X-Idempotency-Key': idempotencyKey
   };
 
+  if (paymentMode === 'pix') {
+    const response = await fetch('https://api.mercadopago.com/v1/payments', {
+      method: 'POST',
+      headers: commonHeaders,
+      body: JSON.stringify({
+        transaction_amount: Number(order.total),
+        description: `Pedido ${order.order_number} - Açaí do Bom`,
+        payment_method_id: 'pix',
+        external_reference: order.id,
+        notification_url: notificationUrl,
+        payer: {
+          email,
+          first_name: String(customer.name || '').trim().split(/\s+/)[0] || 'Cliente'
+        }
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = result?.message || result?.error || result?.cause?.[0]?.description || 'O Mercado Pago não conseguiu gerar o PIX.';
+      return json({ error: message }, response.status);
+    }
+    const details = paymentDetails(result);
+    if (!details.qrCode || !details.qrCodeBase64) {
+      return json({ error: 'O Mercado Pago não retornou o QR Code do PIX.' }, 502);
+    }
+    await db.from('orders').update({
+      payment_method: 'mercadopago_pix',
+      payment_provider: 'mercadopago',
+      payment_reference: details.reference,
+      checkout_url: details.ticketUrl,
+      updated_at: new Date().toISOString()
+    }).eq('id', order.id);
+    return json({
+      paymentMode: 'pix',
+      reference: details.reference,
+      checkoutUrl: details.ticketUrl,
+      ticketUrl: details.ticketUrl,
+      qrCode: details.qrCode,
+      qrCodeBase64: details.qrCodeBase64
+    });
+  }
+
   const preferenceItems = items.map((item: any, index: number) => ({
     id: String(index + 1),
     title: item.title,
@@ -106,15 +149,10 @@ Deno.serve(async req => {
           failure: `${returnUrl}falhou`
         },
         auto_return: 'approved',
-        payment_methods: paymentMode === 'pix'
-          ? {
-              excluded_payment_types: [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'ticket' }, { id: 'atm' }],
-              installments: 1
-            }
-          : {
-              excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
-              installments: 10
-            }
+        payment_methods: {
+          excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
+          installments: 10
+        }
       };
 
   const endpoint = 'https://api.mercadopago.com/checkout/preferences';
@@ -139,9 +177,7 @@ Deno.serve(async req => {
           failure: `${returnUrl}falhou`
         },
         auto_return: 'approved',
-        payment_methods: paymentMode === 'pix'
-          ? { excluded_payment_types: [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'ticket' }, { id: 'atm' }], installments: 1 }
-          : undefined
+        payment_methods: undefined
       })
     });
     result = await response.json().catch(() => ({}));
@@ -158,7 +194,7 @@ Deno.serve(async req => {
 
   const checkoutUrl = details.checkoutUrl;
   await db.from('orders').update({
-    payment_method: paymentMode === 'pix' ? 'mercadopago_pix' : 'mercadopago_card',
+    payment_method: 'mercadopago_card',
     payment_provider: 'mercadopago',
     payment_reference: details.reference,
     checkout_url: checkoutUrl,

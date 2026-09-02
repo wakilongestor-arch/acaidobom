@@ -341,8 +341,21 @@
   function startingPrice(product) {
     const finalPrices = (product.addonGroups || [])
       .filter(group => group.priceMode === 'final')
-      .flatMap(group => (group.options || []).filter(option => option.available !== false).map(option => Number(option.price)).filter(Number.isFinite));
+      .flatMap(group => (group.options || [])
+        .filter(option => option.available !== false)
+        .map(option => Number(option.price))
+        .filter(price => Number.isFinite(price) && price > 0));
     return finalPrices.length ? Math.min(...finalPrices) : Number(product.price || 0);
+  }
+
+  function selectCheapestFinalOption() {
+    const finalGroup = productGroups().find(group => group.priceMode === 'final' &&
+      group.options.some(option => Number.isFinite(Number(option.price)) && Number(option.price) > 0));
+    if (!finalGroup || (selections[finalGroup.id] || []).length) return;
+    const cheapest = [...finalGroup.options]
+      .filter(option => Number.isFinite(Number(option.price)) && Number(option.price) > 0)
+      .sort((left, right) => Number(left.price) - Number(right.price))[0];
+    if (cheapest) selections[finalGroup.id] = [cheapest];
   }
 
   function renderProducts() {
@@ -447,6 +460,7 @@
     productStep = 0;
     const category = catalog.categories.find(item => item.id === selected.categoryId) || {};
     const displayPrice = startingPrice(selected);
+    selectCheapestFinalOption();
     MenuAPI.trackEcommerce('view_item', [{
       productId: selected.id,
       name: selected.name,
@@ -514,7 +528,9 @@
 
   function updateProductTotal() {
     $('#item-quantity').textContent = quantity;
-    const total = unitTotal() * quantity;
+    const currentUnitTotal = unitTotal();
+    const total = currentUnitTotal * quantity;
+    $('#product-base-price').textContent = MenuAPI.money(currentUnitTotal);
     $('#product-action-price').textContent = MenuAPI.money(total);
     $('#add-to-cart').textContent = 'Adicionar ao pedido';
   }

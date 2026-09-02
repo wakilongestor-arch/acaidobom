@@ -107,6 +107,7 @@
   async function createOrder(payload, orderNumber) {
     const db = getClient();
     if (!db) return false;
+    const awaitingMercadoPago = ['mercadopago_pix', 'mercadopago_card'].includes(payload.paymentMethod);
     const row = {
       id: crypto.randomUUID(),
       order_number: orderNumber,
@@ -120,7 +121,7 @@
       subtotal: Number(payload.subtotal || 0),
       delivery_fee: Number(payload.deliveryFee || 0),
       total: Number(payload.total || 0),
-      status: 'novo',
+      status: awaitingMercadoPago ? 'aguardando_pagamento' : 'novo',
       payment_status: 'pendente'
     };
     const { error } = await db.from('orders').insert(row);
@@ -205,6 +206,7 @@
     const { data, error } = await db
       .from('orders')
       .select('*')
+      .neq('status', 'aguardando_pagamento')
       .order('created_at', { ascending: false })
       .limit(1000);
     throwIfError(error, 'Não foi possível carregar os pedidos.');

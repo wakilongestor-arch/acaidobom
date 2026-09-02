@@ -174,10 +174,14 @@ Deno.serve(async req => {
     paymentStatuses.some((status: string) => ['processed', 'accredited', 'approved'].includes(status));
   const refunded = ['refunded', 'charged_back'].includes(orderStatus) ||
     paymentStatuses.some((status: string) => ['refunded', 'charged_back'].includes(status));
-  const nextPaymentStatus = paid ? 'pago' : refunded ? 'estornado' : 'pendente';
+  const rejected = ['rejected', 'cancelled', 'canceled'].includes(orderStatus) ||
+    paymentStatuses.some((status: string) => ['rejected', 'cancelled', 'canceled'].includes(status));
+  const nextPaymentStatus = paid ? 'pago' : refunded ? 'estornado' : rejected ? 'recusado' : 'pendente';
+  const becamePaid = nextPaymentStatus === 'pago' && order.payment_status !== 'pago';
 
   const paidAt = new Date().toISOString();
   await db.from('orders').update({
+    status: becamePaid && order.status === 'aguardando_pagamento' ? 'novo' : order.status,
     payment_status: nextPaymentStatus,
     payment_provider: 'mercadopago',
     payment_reference: String(mercadoPagoResource.id || dataId),
@@ -185,7 +189,7 @@ Deno.serve(async req => {
   }).eq('id', order.id);
 
   let conversions: Record<string, unknown> = {};
-  if (nextPaymentStatus === 'pago') {
+  if (becamePaid) {
     const confirmedOrder = { ...order, payment_status: 'pago', payment_provider: 'mercadopago', updated_at: paidAt };
     const metaResponse = await fetch(`${supabaseUrl}/functions/v1/meta-conversions`, {
       method: 'POST',
@@ -209,5 +213,26 @@ Deno.serve(async req => {
     };
   }
 
-  return json({ received: true, orderId: order.id, paymentStatus: nextPaymentStatus, conversions });
+  let notifications: Record<string, unknown> = {};
+  if (becamePaid) {
+    const functionHeaders = {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+      'Content-Type': 'application/json'
+    };
+    const [emailResponse, whatsappResponse] = await Promise.all([
+      fetch(`${supabaseUrl}/functions/v1/order-email`, {
+        method: 'POST', headers: functionHeaders, body: JSON.stringify({ orderId: order.id, event: 'created' })
+      }),
+      fetch(`${supabaseUrl}/functions/v1/whatsapp-order`, {
+        method: 'POST', headers: functionHeaders, body: JSON.stringify({ orderId: order.id })
+      })
+    ]);
+    notifications = {
+      email: await emailResponse.json().catch(() => ({ sent: false, status: emailResponse.status })),
+      whatsapp: await whatsappResponse.json().catch(() => ({ sent: false, status: whatsappResponse.status }))
+    };
+  }
+
+  return json({ received: true, orderId: order.id, paymentStatus: nextPaymentStatus, conversions, notifications });
 });

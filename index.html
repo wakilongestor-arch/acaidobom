@@ -35,7 +35,7 @@
   {"@context":"https://schema.org","@type":"Restaurant","name":"Açaí do Bom","url":"https://acaidobom.com.br/","logo":"https://acaidobom.com.br/assets/images/favicon/favicon-512.png","image":"https://acaidobom.com.br/assets/images/social/cardapio-acai-do-bom.jpg","telephone":"+556993817951","servesCuisine":["Açaí","Lanches","Pastéis"],"priceRange":"R$","address":{"@type":"PostalAddress","addressLocality":"Ji-Paraná","addressRegion":"RO","addressCountry":"BR"},"areaServed":{"@type":"City","name":"Ji-Paraná"},"hasMenu":"https://acaidobom.com.br/#cardapio"}
   </script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" href="assets/css/style.css?v=20260831-checkout-mobile">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260902-payment-review">
   <link rel="stylesheet" href="assets/css/theme-custom.css?v=20260831-selection-cart-v7">
   <link rel="stylesheet" href="assets/css/consent.css?v=20260830-bannerfix">
 </head>
@@ -127,7 +127,7 @@
   <div class="overlay" id="checkout-overlay" hidden>
     <section class="modal checkout-modal" role="dialog" aria-modal="true">
       <button class="modal-close" id="close-checkout" aria-label="Fechar">×</button>
-      <header class="checkout-head"><button id="checkout-back" aria-label="Voltar">←</button><div><h2>Finalizar pedido</h2><p id="checkout-step-label">Etapa 1 de 3</p></div><span><i id="checkout-progress"></i></span></header>
+      <header class="checkout-head"><button id="checkout-back" aria-label="Voltar">←</button><div><h2>Finalizar pedido</h2><p id="checkout-step-label">Etapa 1 de 4</p></div><span><i id="checkout-progress"></i></span></header>
       <form id="checkout-form">
         <div class="checkout-step" data-step="1">
           <div class="form-grid">
@@ -150,6 +150,10 @@
           <div class="reservation-fields" id="reservation-fields" hidden><div><small>LOJA FECHADA</small><h3>Reserve seu pedido</h3><p>Escolha quando deseja receber. A reserva só será válida após a confirmação da loja por e-mail.</p></div><label class="field"><span>Data e horário *</span><input id="reservation-at" name="reservationAt" type="datetime-local"></label></div>
           <div class="summary" id="order-summary"></div>
         </div>
+        <div class="checkout-step" data-step="4" hidden>
+          <div class="checkout-review-head"><small>CONFIRA ANTES DE PAGAR</small><h3>Está tudo certo?</h3><p>Revise seus dados, endereço, produtos e forma de pagamento.</p></div>
+          <div class="checkout-review" id="checkout-review"></div>
+        </div>
         <p class="error" id="checkout-error" hidden></p>
         <footer><button class="primary" id="checkout-next" type="button">Continuar →</button><button class="primary" id="checkout-submit" type="submit" hidden>Confirmar pedido</button></footer>
       </form>
@@ -160,10 +164,10 @@
   <button class="mobile-cart" data-open-cart hidden><span>🛍 <b data-cart-count>0</b></span><strong>Ver pedido</strong><em id="mobile-total">R$ 0,00</em></button>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="assets/js/supabase-config.js"></script>
-  <script src="assets/js/supabase-store.js?v=20260830-capi"></script>
-  <script src="assets/js/api.js?v=20260831-reservation-tracking"></script>
+  <script src="assets/js/supabase-store.js?v=20260902-payment-approval"></script>
+  <script src="assets/js/api.js?v=20260902-payment-approval"></script>
   <script src="assets/js/cart.js?v=20260831-free-delivery"></script>
-  <script src="assets/js/checkout.js?v=20260831-reservation"></script>
-  <script src="assets/js/app.js?v=20260831-selection-cart-v7"></script>
+  <script src="assets/js/checkout.js?v=20260902-payment-review"></script>
+  <script src="assets/js/app.js?v=20260902-min-price"></script>
 </body>
 </html>

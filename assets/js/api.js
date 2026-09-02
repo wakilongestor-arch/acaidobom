@@ -54,10 +54,14 @@
 
   async function createOrder(payload) {
     const orderNumber = `ADB-${Date.now().toString().slice(-7)}${Math.floor(10 + Math.random() * 90)}`;
+    const mercadoPagoMode = payload.paymentMethod === 'mercadopago_pix'
+      ? 'pix'
+      : payload.paymentMethod === 'mercadopago_card'
+        ? 'card'
+        : '';
     if (window.SupabaseStore?.configured) {
       try {
         const saved = await window.SupabaseStore.createOrder(payload, orderNumber);
-        trackOrderCreated(payload, orderNumber);
         const settings = window.ACAI_CATALOG?.settings || {};
         let notificationSent = false;
         let notificationError = '';
@@ -71,7 +75,7 @@
         let pixQrCodeBase64 = '';
         let pixTicketUrl = '';
         let paymentError = '';
-        if (saved?.id) {
+        if (!mercadoPagoMode && saved?.id) {
           try {
             const emailNotification = await window.SupabaseStore.notifyOrderEmail(saved.id, 'created');
             storeEmailSent = emailNotification.sent === true;
@@ -81,7 +85,7 @@
             console.error('Pedido salvo; falha na automação de e-mail.', error);
           }
         }
-        if (settings.whatsappCloudEnabled && saved?.id) {
+        if (!mercadoPagoMode && settings.whatsappCloudEnabled && saved?.id) {
           try {
             const notification = await window.SupabaseStore.notifyOrder(saved.id);
             notificationSent = notification.sent === true;
@@ -90,11 +94,6 @@
             console.error('Pedido salvo; falha no WhatsApp Cloud API.', error);
           }
         }
-        const mercadoPagoMode = payload.paymentMethod === 'mercadopago_pix'
-          ? 'pix'
-          : payload.paymentMethod === 'mercadopago_card'
-            ? 'card'
-            : '';
         if (mercadoPagoMode && saved?.id) {
           try {
             const checkout = await window.SupabaseStore.createCheckout(saved.id, mercadoPagoMode);
@@ -106,7 +105,7 @@
             pixTicketUrl = checkout.ticketUrl || '';
           } catch (error) {
             console.error('Pedido salvo; falha ao criar checkout.', error);
-            paymentError = error.message || 'O Mercado Pago não criou o pagamento.';
+            throw new Error(error.message || 'O Mercado Pago não criou o pagamento.');
           }
         } else if (payload.paymentMethod === 'payment_link' && settings.gatewayEnabled && settings.gatewayProvider !== 'none' && saved?.id) {
           try {
@@ -118,6 +117,7 @@
             console.error('Pedido salvo; falha ao criar checkout.', error);
           }
         }
+        if (!mercadoPagoMode) trackOrderCreated(payload, orderNumber);
         return orderResult(orderNumber, payload, true, {
           orderId: saved?.id || '',
           notificationSent,
@@ -135,6 +135,7 @@
         });
       } catch (error) {
         console.error('Pedido não salvo no Supabase.', error);
+        if (mercadoPagoMode) throw error;
       }
     }
 

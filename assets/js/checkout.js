@@ -225,17 +225,19 @@
     document.querySelectorAll('.checkout-step').forEach(element => {
       element.hidden = Number(element.dataset.step) !== step;
     });
-    $('#checkout-step-label').textContent = `Etapa ${step} de 3`;
-    $('#checkout-progress').style.width = `${(step / 3) * 100}%`;
+    $('#checkout-step-label').textContent = `Etapa ${step} de 4`;
+    $('#checkout-progress').style.width = `${(step / 4) * 100}%`;
     $('#checkout-back').disabled = step === 1;
-    $('#checkout-next').hidden = step === 3;
-    $('#checkout-submit').hidden = step !== 3;
+    $('#checkout-next').hidden = step === 4;
+    $('#checkout-next').textContent = step === 3 ? 'Revisar pedido →' : 'Continuar →';
+    $('#checkout-submit').hidden = step !== 4;
     $('#checkout-error').hidden = true;
     renderDeliveryQuote();
     if (step === 3) {
       renderPayments();
       renderSummary();
     }
+    if (step === 4) renderReview();
   }
 
   function formData() {
@@ -285,8 +287,16 @@
     const fallback = mercadoPagoEnabled ? 'mercadopago_pix' : 'pix';
     const selected = document.querySelector('input[name=paymentMethod]:checked')?.value;
     const current = methods.some(([value]) => value === selected) ? selected : fallback;
+    const media = {
+      mercadopago_pix: '<span class="payment-brand pix-brand"><img src="assets/images/payments/pix.png" alt="Pix"><em>PIX</em></span>',
+      mercadopago_card: '<span class="payment-brand mp-brand"><img src="assets/images/payments/mercado-pago.png" alt="Mercado Pago"></span>',
+      card_delivery: '<span class="payment-brand payment-emoji" aria-hidden="true">💳</span>',
+      cash: '<span class="payment-brand payment-emoji" aria-hidden="true">💵</span>',
+      pix: '<span class="payment-brand pix-brand"><img src="assets/images/payments/pix.png" alt="Pix"><em>PIX</em></span>',
+      payment_link: '<span class="payment-brand payment-emoji" aria-hidden="true">🔒</span>'
+    };
     $('#payment-options').innerHTML = methods.map(([value, label, description]) =>
-      `<label><input type="radio" name="paymentMethod" value="${value}" ${value === current ? 'checked' : ''}><span><b>${label}</b><small>${description}</small></span></label>`
+      `<label class="payment-option"><input type="radio" name="paymentMethod" value="${value}" ${value === current ? 'checked' : ''}>${media[value] || ''}<span class="payment-copy"><b>${label}</b><small>${description}</small></span><i aria-hidden="true"></i></label>`
     ).join('');
     $('#payment-options').querySelectorAll('input').forEach(input => {
       input.addEventListener('change', () => { $('#change-field').hidden = input.value !== 'cash'; });
@@ -303,6 +313,37 @@
       `<div><span>${quote.zone?.name ? `Entrega · ${quote.zone.name}` : 'Entrega'}</span><b>${MenuAPI.money(delivery)}</b></div>` +
       `<div class="total"><span>Total</span><b>${MenuAPI.money(total)}</b></div>`;
     $('#checkout-submit').textContent = reservationMode ? `Reservar · ${MenuAPI.money(total)}` : `Confirmar · ${MenuAPI.money(total)}`;
+  }
+
+  function paymentName(value) {
+    return ({
+      mercadopago_pix: 'PIX pelo Mercado Pago', mercadopago_card: 'Cartão pelo Mercado Pago',
+      card_delivery: 'Cartão na entrega', cash: 'Dinheiro', pix: 'PIX', payment_link: 'Pagamento on-line'
+    })[value] || 'Não informado';
+  }
+
+  function renderReview() {
+    const data = formData();
+    const quote = deliveryQuote(data);
+    const onlinePayment = ['mercadopago_pix', 'mercadopago_card'].includes(data.paymentMethod);
+    const address = data.fulfillment === 'pickup'
+      ? 'Retirada no Açaí do Bom'
+      : `${escapeHtml(data.street)}, ${escapeHtml(data.number)}${data.complement ? ` — ${escapeHtml(data.complement)}` : ''}<br>${escapeHtml(data.neighborhood)} — ${escapeHtml(data.city)} · CEP ${escapeHtml(data.zip)}${data.reference ? `<br>Referência: ${escapeHtml(data.reference)}` : ''}`;
+    const items = CartStore.get().map(item => {
+      const options = (item.selections || []).flatMap(selection => (selection.options || []).map(option => option.name)).join(', ');
+      return `<div class="review-item"><span><b>${item.quantity}x ${escapeHtml(item.name)}</b>${options ? `<small>${escapeHtml(options)}</small>` : ''}</span><strong>${MenuAPI.money(item.unitTotal * item.quantity)}</strong></div>`;
+    }).join('');
+    $('#checkout-review').innerHTML =
+      `<section><header><b>Seus dados</b><button type="button" data-review-step="1">Corrigir</button></header><p>${escapeHtml(data.name)} · ${escapeHtml(data.phone)}<br><strong>${escapeHtml(data.email)}</strong></p></section>` +
+      `<section><header><b>${data.fulfillment === 'pickup' ? 'Retirada' : 'Endereço de entrega'}</b><button type="button" data-review-step="2">Corrigir</button></header><p>${address}</p></section>` +
+      `<section><header><b>Pedido</b><button type="button" data-review-step="3">Corrigir</button></header>${items}<div class="review-total"><span>Subtotal</span><b>${MenuAPI.money(CartStore.subtotal())}</b></div><div class="review-total"><span>Entrega</span><b>${MenuAPI.money(quote.fee)}</b></div><div class="review-total grand"><span>Total</span><b>${MenuAPI.money(CartStore.subtotal() + quote.fee)}</b></div></section>` +
+      `<section class="review-payment"><header><b>Pagamento escolhido</b><button type="button" data-review-step="3">Corrigir</button></header><p>${escapeHtml(paymentName(data.paymentMethod))}</p>${['mercadopago_pix', 'mercadopago_card'].includes(data.paymentMethod) ? '<small>O pedido só será enviado à loja após o Mercado Pago aprovar o pagamento.</small>' : ''}</section>`;
+    $('#checkout-submit').textContent = onlinePayment
+      ? `Confirmar e pagar · ${MenuAPI.money(CartStore.subtotal() + quote.fee)}`
+      : `Confirmar pedido · ${MenuAPI.money(CartStore.subtotal() + quote.fee)}`;
+    $('#checkout-review').querySelectorAll('[data-review-step]').forEach(button => {
+      button.addEventListener('click', () => { step = Number(button.dataset.reviewStep); render(); });
+    });
   }
 
   async function submit(event) {
@@ -384,11 +425,12 @@
     };
     let whatsappWindow = null;
     let paymentWindow = null;
-    if (catalog.settings.autoOpenWhatsApp !== false && !catalog.settings.whatsappCloudEnabled) {
+    const mercadoPagoPayment = ['mercadopago_card', 'mercadopago_pix'].includes(payload.paymentMethod);
+    if (!mercadoPagoPayment && catalog.settings.autoOpenWhatsApp !== false && !catalog.settings.whatsappCloudEnabled) {
       whatsappWindow = window.open('', 'acai-pedido-whatsapp');
       if (whatsappWindow) whatsappWindow.document.title = 'Preparando pedido no WhatsApp';
     }
-    if (['mercadopago_card', 'mercadopago_pix'].includes(payload.paymentMethod)) {
+    if (payload.paymentMethod === 'mercadopago_card') {
       paymentWindow = window.open('', 'acai-pagamento-mercadopago');
       if (paymentWindow) paymentWindow.document.title = 'Abrindo pagamento seguro';
     }
@@ -396,14 +438,16 @@
       const result = await MenuAPI.createOrder(payload);
       if (data.rememberProfile === '1') saveProfile(payload);
       else removeProfile(payload.customer.phone);
-      CartStore.clear();
-      showSuccess(result, data.name, isReservation);
-      if (!isReservation && result.orderId && ['pix', 'card'].includes(result.paymentMode) && !result.paymentError) {
-        monitorPayment(result, payload);
-      }
       if (paymentWindow) {
         if (result.paymentUrl) paymentWindow.location.replace(result.paymentUrl);
         else paymentWindow.close();
+      }
+      if (mercadoPagoPayment) {
+        showPaymentWaiting(result);
+        monitorPayment(result, payload, data.name);
+      } else {
+        CartStore.clear();
+        showSuccess(result, data.name, isReservation);
       }
       if (whatsappWindow) {
         if (result.whatsappUrl) whatsappWindow.location.replace(result.whatsappUrl);
@@ -417,10 +461,39 @@
       box.hidden = false;
     } finally {
       button.disabled = false;
+      button.textContent = 'Confirmar e pagar';
     }
   }
 
-  function monitorPayment(result, payload) {
+  function showPaymentWaiting(result) {
+    $('#checkout-form').hidden = true;
+    const box = $('#order-success');
+    box.hidden = false;
+    const safeQrImage = /^[A-Za-z0-9+/=\r\n]+$/.test(String(result.pixQrCodeBase64 || ''))
+      ? String(result.pixQrCodeBase64).replace(/\s/g, '')
+      : '';
+    const pixBox = result.paymentMode === 'pix' && result.pixQrCode
+      ? `<section class="mercadopago-pix payment-pix-live"><span class="mp-badge">PIX MERCADO PAGO</span><h3>Escaneie para pagar</h3>` +
+        (safeQrImage ? `<img src="data:image/png;base64,${safeQrImage}" alt="QR Code Pix do pedido">` : '') +
+        `<label>Pix copia e cola</label><div class="pix-copy"><input value="${escapeHtml(result.pixQrCode)}" readonly><button type="button" data-copy-waiting-pix>Copiar Pix</button></div></section>`
+      : '';
+    box.innerHTML = '<span class="payment-waiting-icon"></span><small>PAGAMENTO SEGURO</small><h2>Conclua no Mercado Pago</h2><p>Seu pedido ainda não foi enviado à loja. Ele será gerado somente depois da aprovação do pagamento.</p>' + pixBox +
+      (result.paymentUrl ? `<div class="success-links single"><a href="${escapeHtml(result.paymentUrl)}" target="_blank" rel="noopener">${result.paymentMode === 'pix' ? 'Abrir PIX no Mercado Pago' : 'Abrir Mercado Pago novamente'}</a></div>` : '') +
+      '<div class="payment-waiting-note">Aguardando confirmação automática…</div><button type="button" class="link-button" data-cancel-payment>Voltar e corrigir</button>';
+    box.querySelector('[data-copy-waiting-pix]')?.addEventListener('click', async event => {
+      await navigator.clipboard.writeText(result.pixQrCode);
+      event.currentTarget.textContent = 'Copiado!';
+    });
+    box.querySelector('[data-cancel-payment]')?.addEventListener('click', () => {
+      clearTimeout(paymentTimer);
+      box.hidden = true;
+      $('#checkout-form').hidden = false;
+      step = 4;
+      render();
+    });
+  }
+
+  function monitorPayment(result, payload, customerName) {
     clearTimeout(paymentTimer);
     const startedAt = Date.now();
     const check = async () => {
@@ -432,10 +505,12 @@
             MenuAPI.trackConfirmedPurchase(payload, result.orderNumber);
             localStorage.setItem(storageKey, '1');
           }
-          const successBox = $('#order-success');
-          if (successBox && !successBox.querySelector('.payment-approved')) {
-            successBox.querySelector('.order-number')?.insertAdjacentHTML('afterend', '<div class="payment-approved">✓ Pagamento aprovado pelo Mercado Pago</div>');
-          }
+          CartStore.clear();
+          showSuccess({ ...result, paymentApproved: true, emailAutomationConfigured: true }, customerName, false);
+          return;
+        }
+        if (['recusado', 'estornado'].includes(status.paymentStatus)) {
+          showPaymentRejected(status.paymentStatus);
           return;
         }
       } catch (error) {
@@ -448,13 +523,30 @@
     paymentTimer = setTimeout(check, 3000);
   }
 
+  function showPaymentRejected(paymentStatus) {
+    clearTimeout(paymentTimer);
+    const box = $('#order-success');
+    const refunded = paymentStatus === 'estornado';
+    box.innerHTML = `<span class="payment-rejected-icon">!</span><small>PAGAMENTO NÃO CONCLUÍDO</small><h2>${refunded ? 'Pagamento estornado' : 'Pagamento recusado'}</h2>` +
+      '<p>O pedido não foi enviado à loja e nenhuma compra foi registrada nas conversões.</p>' +
+      '<button type="button" class="primary payment-retry" data-retry-payment>Voltar e escolher outra forma</button>';
+    box.querySelector('[data-retry-payment]')?.addEventListener('click', () => {
+      box.hidden = true;
+      $('#checkout-form').hidden = false;
+      step = 3;
+      render();
+    });
+  }
+
   function showSuccess(result, name, isReservation = false) {
     $('#checkout-form').hidden = true;
     const box = $('#order-success');
     box.hidden = false;
-    const title = result.stored ? (isReservation ? 'RESERVA REGISTRADA' : 'PEDIDO REGISTRADO') : 'PEDIDO PRONTO';
+    const title = result.paymentApproved ? 'PAGAMENTO APROVADO' : result.stored ? (isReservation ? 'RESERVA REGISTRADA' : 'PEDIDO REGISTRADO') : 'PEDIDO PRONTO';
     const message = result.stored
-      ? (isReservation
+      ? (result.paymentApproved
+        ? 'Seu pagamento foi confirmado e agora o pedido foi enviado para a loja.'
+        : isReservation
         ? 'Sua reserva foi recebida. Fique de olho no seu e-mail e aguarde a confirmação da loja.'
         : 'Sua solicitação de pedido foi recebida. Fique de olho no seu e-mail e aguarde a confirmação da loja antes de considerar o pedido aprovado.')
       : 'Não foi possível registrar sua solicitação. Volte ao cardápio e tente novamente.';
@@ -508,7 +600,7 @@
     if (bound) return;
     bound = true;
     $('#checkout-next').addEventListener('click', () => {
-      if (validate()) { step = Math.min(3, step + 1); render(); }
+      if (validate()) { step = Math.min(4, step + 1); render(); }
     });
     $('#checkout-back').addEventListener('click', () => { step = Math.max(1, step - 1); render(); });
     $('#close-checkout').addEventListener('click', close);
@@ -530,11 +622,11 @@
       const digits = normalizePostalCode(zip.value);
       zip.value = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
       renderDeliveryQuote();
-      if (step === 3) renderSummary();
+      if (step >= 3) { renderSummary(); if (step === 4) renderReview(); }
     });
-    neighborhood.addEventListener('input', () => { renderDeliveryQuote(); if (step === 3) renderSummary(); });
+    neighborhood.addEventListener('input', () => { renderDeliveryQuote(); if (step >= 3) renderSummary(); });
     document.querySelectorAll('input[name=fulfillment]').forEach(input => {
-      input.addEventListener('change', () => { $('#address-fields').hidden = input.value === 'pickup'; renderDeliveryQuote(); if (step === 3) renderSummary(); });
+      input.addEventListener('change', () => { $('#address-fields').hidden = input.value === 'pickup'; renderDeliveryQuote(); if (step >= 3) renderSummary(); });
     });
   }
 
