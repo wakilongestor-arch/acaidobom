@@ -139,30 +139,37 @@ Deno.serve(async req => {
   const body = await req.json().catch(() => ({}));
   const type = String(url.searchParams.get('type') || body.type || '').toLowerCase();
   const dataId = String(url.searchParams.get('data.id') || url.searchParams.get('data_id') || body?.data?.id || '');
-  if (!dataId || type !== 'order') return json({ received: true, ignored: true });
+  if (!dataId || !['order', 'payment'].includes(type)) return json({ received: true, ignored: true });
   if (!(await validSignature(req, dataId, webhookSecret))) return json({ error: 'Assinatura inválida.' }, 401);
 
-  const orderResponse = await fetch(`https://api.mercadopago.com/v1/orders/${encodeURIComponent(dataId)}`, {
+  const resourceUrl = type === 'payment'
+    ? `https://api.mercadopago.com/v1/payments/${encodeURIComponent(dataId)}`
+    : `https://api.mercadopago.com/v1/orders/${encodeURIComponent(dataId)}`;
+  const orderResponse = await fetch(resourceUrl, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
-  const mercadoPagoOrder = await orderResponse.json().catch(() => ({}));
-  if (!orderResponse.ok) return json({ error: 'Não foi possível confirmar a order no Mercado Pago.' }, 502);
+  const mercadoPagoResource = await orderResponse.json().catch(() => ({}));
+  if (!orderResponse.ok) return json({ error: 'Não foi possível confirmar o pagamento no Mercado Pago.' }, 502);
 
-  const orderId = String(mercadoPagoOrder.external_reference || '');
+  const orderId = String(mercadoPagoResource.external_reference || '');
   if (!orderId) return json({ received: true, ignored: true, reason: 'order_missing' });
 
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { data: order, error } = await db.from('orders').select('*').eq('id', orderId).maybeSingle();
   if (error || !order) return json({ received: true, ignored: true, reason: 'order_not_found' });
 
-  const chargedAmount = Number(mercadoPagoOrder.total_amount || 0);
+  const chargedAmount = Number(type === 'payment'
+    ? mercadoPagoResource.transaction_amount
+    : mercadoPagoResource.total_amount || 0);
   if (Math.abs(chargedAmount - Number(order.total || 0)) > 0.01) {
     return json({ error: 'O valor da order não confere com o pedido.' }, 409);
   }
 
-  const orderStatus = String(mercadoPagoOrder.status || '').toLowerCase();
-  const paymentStatuses = (mercadoPagoOrder?.transactions?.payments || [])
-    .map((payment: any) => String(payment.status || '').toLowerCase());
+  const orderStatus = String(mercadoPagoResource.status || '').toLowerCase();
+  const paymentStatuses = type === 'payment'
+    ? [orderStatus]
+    : (mercadoPagoResource?.transactions?.payments || [])
+      .map((payment: any) => String(payment.status || '').toLowerCase());
   const paid = ['processed', 'accredited', 'approved'].includes(orderStatus) ||
     paymentStatuses.some((status: string) => ['processed', 'accredited', 'approved'].includes(status));
   const refunded = ['refunded', 'charged_back'].includes(orderStatus) ||
@@ -173,7 +180,7 @@ Deno.serve(async req => {
   await db.from('orders').update({
     payment_status: nextPaymentStatus,
     payment_provider: 'mercadopago',
-    payment_reference: String(mercadoPagoOrder.id || dataId),
+    payment_reference: String(mercadoPagoResource.id || dataId),
     updated_at: paidAt
   }).eq('id', order.id);
 

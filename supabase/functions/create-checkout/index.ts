@@ -39,7 +39,7 @@ function paymentDetails(result: any) {
   const method = payment.payment_method || {};
   return {
     reference: String(result?.id || payment.id || ''),
-    checkoutUrl: String(result?.checkout_url || ''),
+    checkoutUrl: String(result?.init_point || result?.checkout_url || ''),
     ticketUrl: String(method.ticket_url || payment.ticket_url || ''),
     qrCode: String(method.qr_code || payment.qr_code || ''),
     qrCodeBase64: String(method.qr_code_base64 || payment.qr_code_base64 || '')
@@ -108,30 +108,33 @@ Deno.serve(async req => {
         config: { notification_url: notificationUrl }
       }
     : {
-        type: 'online',
-        processing_mode: 'manual',
-        capture_mode: 'automatic_async',
-        total_amount: money(order.total),
         external_reference: order.id,
-        description: `Pedido ${order.order_number}`,
-        payer: { email },
-        items,
-        config: {
-          notification_url: notificationUrl,
-          online: {
-            success_url: `${returnUrl}aprovado`,
-            pending_url: `${returnUrl}pendente`,
-            failure_url: `${returnUrl}falhou`,
-            auto_return: 'approved'
-          },
-          payment_method: {
-            not_allowed_types: ['ticket', 'bank_transfer'],
-            max_installments: 10
-          }
+        notification_url: notificationUrl,
+        statement_descriptor: 'ACAI DO BOM',
+        payer: { email, name: String(customer.name || '').trim() },
+        items: items.map((item: any, index: number) => ({
+          id: String(index + 1),
+          title: item.title,
+          quantity: item.quantity,
+          unit_price: Number(item.unit_price),
+          currency_id: 'BRL'
+        })),
+        back_urls: {
+          success: `${returnUrl}aprovado`,
+          pending: `${returnUrl}pendente`,
+          failure: `${returnUrl}falhou`
+        },
+        auto_return: 'approved',
+        payment_methods: {
+          excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
+          installments: 10
         }
       };
 
-  const response = await fetch('https://api.mercadopago.com/v1/orders', {
+  const endpoint = paymentMode === 'pix'
+    ? 'https://api.mercadopago.com/v1/orders'
+    : 'https://api.mercadopago.com/checkout/preferences';
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: commonHeaders,
     body: JSON.stringify(payload)
