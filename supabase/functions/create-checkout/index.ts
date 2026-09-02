@@ -151,7 +151,6 @@ Deno.serve(async req => {
         auto_return: 'approved',
         binary_mode: true,
         payment_methods: {
-          excluded_payment_methods: [{ id: 'account_money' }],
           excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
           installments: 10
         }
@@ -181,7 +180,6 @@ Deno.serve(async req => {
         auto_return: 'approved',
         binary_mode: true,
         payment_methods: {
-          excluded_payment_methods: [{ id: 'account_money' }],
           excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
           installments: 10
         }
