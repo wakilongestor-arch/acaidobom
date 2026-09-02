@@ -427,7 +427,7 @@
     const consent = currentConsent();
     if (!consent.decided) return;
 
-    if (trackingSettings.gtmId && consent.marketing) {
+    if (trackingSettings.gtmId && (consent.analytics || consent.marketing)) {
       loadGTM(trackingSettings.gtmId);
       return;
     }
