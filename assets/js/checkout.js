@@ -19,6 +19,28 @@
     return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : '';
   }
 
+  function gaTrackingIds() {
+    if (window.MenuConsent?.get?.().analytics !== true) return { clientId: '', sessionId: '' };
+    const clientParts = readCookie('_ga').split('.');
+    const clientId = clientParts.length >= 2
+      ? clientParts.slice(-2).join('.').replace(/[^0-9.]/g, '')
+      : '';
+    const measurementId = String(window.ACAI_CATALOG?.settings?.ga4Id || '')
+      .replace(/^G-/i, '')
+      .replace(/[^A-Z0-9]/gi, '');
+    const namedCookie = measurementId ? readCookie(`_ga_${measurementId}`) : '';
+    const fallbackCookie = document.cookie.split(';')
+      .map(value => value.trim())
+      .find(value => /^_ga_[^=]+=/.test(value));
+    const sessionCookie = namedCookie || (fallbackCookie ? decodeURIComponent(fallbackCookie.split('=').slice(1).join('=')) : '');
+    const modernSession = sessionCookie.match(/(?:^|\.)s(\d{8,})(?:\$|\.|$)/);
+    const legacySession = sessionCookie.match(/^GS\d+\.\d+\.(\d{8,})/);
+    return {
+      clientId: /^\d+\.\d+$/.test(clientId) ? clientId : '',
+      sessionId: String(modernSession?.[1] || legacySession?.[1] || '')
+    };
+  }
+
   function normalizePhone(value) {
     return String(value || '').replace(/\D/g, '').slice(-11);
   }
@@ -415,7 +437,9 @@
         },
         attribution: window.MenuAttribution?.forOrder?.() || null,
         fbp: readCookie('_fbp'),
-        fbc: readCookie('_fbc')
+        fbc: readCookie('_fbc'),
+        gaClientId: gaTrackingIds().clientId,
+        gaSessionId: gaTrackingIds().sessionId
       },
       fulfillment: data.fulfillment,
       address: {
