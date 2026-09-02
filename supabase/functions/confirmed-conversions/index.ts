@@ -8,6 +8,25 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   status, headers: { ...cors, 'Content-Type': 'application/json' }
 });
 
+function itemVariant(item: any) {
+  return (Array.isArray(item.selections) ? item.selections : [])
+    .flatMap((group: any) => (Array.isArray(group.options) ? group.options : [])
+      .map((option: any) => `${String(group.groupName || 'Opção')}: ${String(option.name || option.title || '')}`))
+    .filter(Boolean)
+    .join(' | ')
+    .slice(0, 100);
+}
+
+function validGaClientId(value: unknown) {
+  const clientId = String(value || '').trim();
+  return /^\d+\.\d+$/.test(clientId) ? clientId : '';
+}
+
+function validGaSessionId(value: unknown) {
+  const sessionId = String(value || '').replace(/\D/g, '');
+  return /^\d{8,}$/.test(sessionId) ? sessionId : '';
+}
+
 async function sendGa4(db: any, order: any) {
   if (order.customer?.trackingConsent?.analytics !== true) {
     return { sent: false, skipped: true, reason: 'analytics_consent_required' };
@@ -41,12 +60,17 @@ async function sendGa4(db: any, order: any) {
   const items = (Array.isArray(order.items) ? order.items : []).map((item: any, index: number) => ({
     item_id: String(item.productId || item.id || index + 1),
     item_name: String(item.name || 'Produto'),
+    item_category: String(item.categoryName || item.categoryId || ''),
+    item_variant: itemVariant(item),
     price: Math.round((Number(item.unitTotal ?? item.basePrice) || 0) * 100) / 100,
     quantity: Math.max(1, Number(item.quantity) || 1)
   }));
-  const attribution = order.customer?.attribution?.last_touch || {};
+  const customer = order.customer || {};
+  const attribution = customer.attribution?.last_touch || {};
+  const gaClientId = validGaClientId(customer.gaClientId);
+  const gaSessionId = validGaSessionId(customer.gaSessionId);
   const payload = {
-    client_id: String(order.id),
+    client_id: gaClientId || String(order.id),
     timestamp_micros: String(Date.now() * 1000),
     events: [{
       name: 'purchase',
@@ -56,6 +80,7 @@ async function sendGa4(db: any, order: any) {
         shipping: Math.round((Number(order.delivery_fee) || 0) * 100) / 100,
         items, order_source: String(attribution.source || ''),
         order_medium: String(attribution.medium || ''), order_campaign: String(attribution.campaign || ''),
+        ...(gaSessionId ? { session_id: Number(gaSessionId), session_engaged: 1 } : {}),
         engagement_time_msec: 1
       }
     }]
