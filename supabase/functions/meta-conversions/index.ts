@@ -57,9 +57,21 @@ function requestIp(req: Request) {
   return forwarded || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || '';
 }
 
+function itemVariant(item: any) {
+  return (Array.isArray(item.selections) ? item.selections : [])
+    .flatMap((group: any) => (Array.isArray(group.options) ? group.options : [])
+      .map((option: any) => `${String(group.groupName || 'Opção')}: ${String(option.name || option.title || '')}`))
+    .filter(Boolean)
+    .join(' | ')
+    .slice(0, 100);
+}
+
 function productContents(items: any[]) {
   return items.map((item, index) => ({
     id: String(item.productId || item.id || index + 1),
+    title: String(item.name || 'Produto').slice(0, 100),
+    category: String(item.categoryName || item.categoryId || '').slice(0, 100),
+    variant: itemVariant(item),
     quantity: Math.max(1, Number(item.quantity) || 1),
     item_price: Math.round((Number(item.unitTotal ?? item.basePrice) || 0) * 100) / 100
   }));
@@ -182,6 +194,8 @@ Deno.serve(async req => {
         order_id: order.order_number,
         content_type: 'product',
         content_ids: contents.map(item => item.id),
+        content_name: contents.map(item => item.title).join(' | ').slice(0, 200),
+        content_category: [...new Set(contents.map(item => item.category).filter(Boolean))].join(' | ').slice(0, 200),
         contents
       }
     }]
