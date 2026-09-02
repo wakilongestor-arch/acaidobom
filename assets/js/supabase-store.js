@@ -178,7 +178,16 @@
     const db = getClient();
     if (!db) throw new Error('Supabase não configurado.');
     const { data, error } = await db.functions.invoke('create-checkout', { body: { orderId, paymentMode } });
-    throwIfError(error, 'O pedido foi salvo, mas o checkout não pôde ser criado.');
+    if (error) {
+      let message = error.message || 'O pedido foi salvo, mas o checkout não pôde ser criado.';
+      try {
+        const detail = await error.context?.clone?.().json();
+        if (detail?.error) message = detail.error;
+      } catch (contextError) {
+        console.warn('Não foi possível ler os detalhes do erro do checkout.', contextError);
+      }
+      throw new Error(message);
+    }
     return data || {};
   }
 

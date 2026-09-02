@@ -39,7 +39,7 @@ function paymentDetails(result: any) {
   const method = payment.payment_method || {};
   return {
     reference: String(result?.id || payment.id || ''),
-    checkoutUrl: String(result?.init_point || result?.checkout_url || ''),
+    checkoutUrl: String(result?.init_point || result?.sandbox_init_point || result?.checkout_url || ''),
     ticketUrl: String(method.ticket_url || payment.ticket_url || ''),
     qrCode: String(method.qr_code || payment.qr_code || ''),
     qrCodeBase64: String(method.qr_code_base64 || payment.qr_code_base64 || '')
@@ -134,14 +134,40 @@ Deno.serve(async req => {
   const endpoint = paymentMode === 'pix'
     ? 'https://api.mercadopago.com/v1/orders'
     : 'https://api.mercadopago.com/checkout/preferences';
-  const response = await fetch(endpoint, {
+  let response = await fetch(endpoint, {
     method: 'POST',
     headers: commonHeaders,
     body: JSON.stringify(payload)
   });
   let result = await response.json().catch(() => ({}));
+  if (!response.ok && paymentMode === 'card') {
+    const cardItems = items.map((item: any, index: number) => ({
+      id: String(index + 1),
+      title: item.title,
+      quantity: item.quantity,
+      unit_price: Number(item.unit_price),
+      currency_id: 'BRL'
+    }));
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: commonHeaders,
+      body: JSON.stringify({
+        items: cardItems,
+        payer: { email },
+        external_reference: order.id,
+        notification_url: notificationUrl,
+        back_urls: {
+          success: `${returnUrl}aprovado`,
+          pending: `${returnUrl}pendente`,
+          failure: `${returnUrl}falhou`
+        },
+        auto_return: 'approved'
+      })
+    });
+    result = await response.json().catch(() => ({}));
+  }
   if (!response.ok) {
-    const message = result?.message || result?.error || result?.errors?.[0]?.message || 'O Mercado Pago recusou a criação do pagamento.';
+    const message = result?.message || result?.error || result?.cause?.[0]?.description || result?.errors?.[0]?.message || 'O Mercado Pago recusou a criação do pagamento.';
     return json({ error: message }, response.status);
   }
 
