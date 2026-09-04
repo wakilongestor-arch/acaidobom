@@ -158,14 +158,28 @@
     return data || {};
   }
 
-  async function confirmOrderConversion(orderId, eventId) {
+  async function confirmOrderConversion(orderId, eventId, forceRetry = false) {
     const db = getClient();
     if (!db) throw new Error('Supabase não configurado.');
     const { data, error } = await db.functions.invoke('confirmed-conversions', {
-      body: { orderId, eventId, sourceUrl: 'https://acaidobom.com.br/' }
+      body: { orderId, eventId, forceRetry, sourceUrl: 'https://acaidobom.com.br/' }
     });
     throwIfError(error, 'O pedido foi confirmado, mas a conversão não pôde ser enviada.');
     return data || {};
+  }
+
+  async function listConversionEvents() {
+    const db = getClient();
+    if (!db) return [];
+    const { data, error } = await db
+      .from('order_webhook_events')
+      .select('order_id,event_type,status,error_message,response_status,updated_at')
+      .in('event_type', ['ga4.purchase', 'meta.purchase'])
+      .order('updated_at', { ascending: false })
+      .limit(2000);
+    if (error && (error.code === '42P01' || /order_webhook_events|schema cache/i.test(error.message || ''))) return [];
+    throwIfError(error, 'Não foi possível consultar o histórico das conversões.');
+    return data || [];
   }
 
   async function notifyOrderEmail(orderId, event = 'created') {
@@ -345,6 +359,7 @@
     notifyOrder,
     notifyMetaPurchase,
     confirmOrderConversion,
+    listConversionEvents,
     getPaymentStatus,
     notifyOrderEmail,
     testMakeWebhook,

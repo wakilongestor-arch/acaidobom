@@ -6,6 +6,8 @@
   let catalog = { settings: {}, categories: [], products: [] };
   let privateSettings = { makeWebhookEnabled: false, makeWebhookUrl: '', driverDeliveryEnabled: false, driverName: '', driverWhatsapp: '', available: false };
   let orders = [];
+  let conversionEvents = [];
+  const sendingConversionOrderIds = new Set();
   let editing = null;
   let editorDirty = false;
   let editorUploadCount = 0;
@@ -75,8 +77,11 @@
       catalog = await SupabaseStore.loadCatalog() || await loadFallbackCatalog();
       const migrated = ensureCatalogDefaults();
       if (migrated) await SupabaseStore.saveCatalog(catalog);
-      privateSettings = await SupabaseStore.loadPrivateSettings();
-      orders = await SupabaseStore.listOrders();
+      [privateSettings, orders, conversionEvents] = await Promise.all([
+        SupabaseStore.loadPrivateSettings(),
+        SupabaseStore.listOrders(),
+        SupabaseStore.listConversionEvents()
+      ]);
       knownOrderIds = new Set(orders.map(order => String(order.id)));
       fill();
       renderAll();
@@ -601,6 +606,7 @@
           marketingConsentAt: customer.marketingConsentAt || '',
           firstOrder: date,
           lastOrder: date,
+          lastOrderRecord: order,
           orderCount: 1,
           totalSpent: order.status === 'cancelado' ? 0 : Number(order.total || 0)
         });
@@ -609,7 +615,11 @@
       current.orderCount += 1;
       current.totalSpent += order.status === 'cancelado' ? 0 : Number(order.total || 0);
       if (date < current.firstOrder) current.firstOrder = date;
-      if (date > current.lastOrder) current.lastOrder = date;
+      if (date > current.lastOrder) {
+        current.lastOrder = date;
+        current.lastOrderRecord = order;
+        current.address = customerAddress(order.address);
+      }
     });
     return [...base.values()].sort((a, b) => b.lastOrder - a.lastOrder);
   }
@@ -629,6 +639,66 @@
     return value.toLocaleDateString('pt-BR');
   }
 
+  function conversionEvent(orderId, eventType) {
+    return conversionEvents.find(event => String(event.order_id) === String(orderId) && event.event_type === eventType);
+  }
+
+  function customerConversionAction(customer) {
+    const order = customer.lastOrderRecord;
+    if (!order) return '<small class="conversion-state disabled">Sem pedido</small>';
+    const eligible = ['confirmado', 'preparando', 'saiu_entrega', 'concluido'].includes(order.status);
+    if (!eligible) {
+      const label = order.status === 'cancelado' ? 'Cancelado' : 'Confirme antes';
+      return `<small class="conversion-state disabled" title="A compra só pode ser enviada depois que o pedido for confirmado.">${label}</small>`;
+    }
+    const ga4 = conversionEvent(order.id, 'ga4.purchase');
+    const meta = conversionEvent(order.id, 'meta.purchase');
+    const sending = sendingConversionOrderIds.has(String(order.id));
+    const allSent = ga4?.status === 'enviado' && meta?.status === 'enviado';
+    const oneSent = ga4?.status === 'enviado' || meta?.status === 'enviado';
+    const hasError = ga4?.status === 'erro' || meta?.status === 'erro';
+    const text = sending ? 'Enviando…' : allSent ? '↻' : hasError ? 'Tentar' : oneSent ? 'Completar' : 'Enviar';
+    const title = allSent
+      ? 'GA4 e Meta já receberam este pedido. Clique para reenviar com o mesmo identificador.'
+      : `Enviar o pedido ${order.order_number} ao GA4 e à Meta`;
+    return `<div class="conversion-control">${allSent ? '<small class="conversion-state sent">✓ Enviado</small>' : ''}<button type="button" class="conversion-action ${allSent ? 'sent' : ''}" data-send-conversion="${esc(order.id)}" title="${esc(title)}" aria-label="${esc(title)}" ${sending ? 'disabled' : ''}>${text}</button></div>`;
+  }
+
+  function conversionReason(result, platform) {
+    if (result?.sent) return `${platform} enviado`;
+    const reasons = {
+      analytics_consent_required: 'consentimento de análise ausente',
+      marketing_consent_required: 'autorização de marketing ausente',
+      order_not_confirmed: 'pedido ainda não confirmado',
+      order_cancelled: 'pedido cancelado'
+    };
+    if (result?.configured === false) return `${platform} não configurado`;
+    return `${platform} não enviado: ${reasons[result?.reason] || result?.error || 'verifique a integração'}`;
+  }
+
+  async function sendCustomerConversion(orderId) {
+    const order = orders.find(item => String(item.id) === String(orderId));
+    if (!order || sendingConversionOrderIds.has(String(orderId))) return;
+    if (!['confirmado', 'preparando', 'saiu_entrega', 'concluido'].includes(order.status)) {
+      notice('Confirme o pedido antes de enviar a conversão.', true);
+      return;
+    }
+    sendingConversionOrderIds.add(String(orderId));
+    renderCustomers();
+    try {
+      const result = await SupabaseStore.confirmOrderConversion(order.id, order.order_number, true);
+      conversionEvents = await SupabaseStore.listConversionEvents();
+      const summary = [conversionReason(result.ga4, 'GA4'), conversionReason(result.meta, 'Meta')].join(' · ');
+      const complete = result.ga4?.sent === true && result.meta?.sent === true;
+      notice(summary, !complete);
+    } catch (error) {
+      notice(error.message, true);
+    } finally {
+      sendingConversionOrderIds.delete(String(orderId));
+      renderCustomers();
+    }
+  }
+
   function renderCustomers() {
     const all = customerBase();
     const visible = filteredCustomers();
@@ -637,9 +707,9 @@
     $('#stat-customer-emails').textContent = all.filter(customer => customer.email).length;
     $('#stat-marketing-consent').textContent = all.filter(customer => customer.marketingConsent).length;
     $('#stat-returning-customers').textContent = all.filter(customer => customer.orderCount > 1).length;
-    $('#customers-list').innerHTML = visible.length ? '<div class="customer-table-head"><span>Cliente</span><span>Contato</span><span>Endereço</span><span>Relacionamento</span><span>Último pedido</span></div>' + visible.map(customer => {
+    $('#customers-list').innerHTML = visible.length ? '<div class="customer-table-head"><span>Cliente</span><span>Contato</span><span>Endereço</span><span>Relacionamento</span><span>Último pedido</span><span>Evento</span></div>' + visible.map(customer => {
       const whatsapp = customer.phoneDigits ? `55${customer.phoneDigits}` : '';
-      return `<article class="customer-row"><div data-label="Cliente"><b>${esc(customer.name || 'Sem nome')}</b><small>${customer.orderCount} pedido${customer.orderCount === 1 ? '' : 's'} · ${money(customer.totalSpent)}</small></div><div data-label="Contato">${whatsapp ? `<a href="https://wa.me/${esc(whatsapp)}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '<span>-</span>'}${customer.email ? `<a href="mailto:${esc(customer.email)}">${esc(customer.email)}</a>` : '<small>Sem e-mail</small>'}</div><div data-label="Endereço"><span>${esc(customer.address || 'Não informado')}</span></div><div data-label="Relacionamento"><em class="consent-badge ${customer.marketingConsent ? 'allowed' : ''}">${customer.marketingConsent ? '✓ Aceitou ofertas' : 'Sem autorização'}</em></div><div data-label="Último pedido"><b>${esc(formatCustomerDate(customer.lastOrder))}</b><small>Cliente desde ${esc(formatCustomerDate(customer.firstOrder))}</small></div></article>`;
+      return `<article class="customer-row"><div data-label="Cliente"><b>${esc(customer.name || 'Sem nome')}</b><small>${customer.orderCount} pedido${customer.orderCount === 1 ? '' : 's'} · ${money(customer.totalSpent)}</small></div><div data-label="Contato">${whatsapp ? `<a href="https://wa.me/${esc(whatsapp)}" target="_blank" rel="noopener">${esc(customer.phone)}</a>` : '<span>-</span>'}${customer.email ? `<a href="mailto:${esc(customer.email)}">${esc(customer.email)}</a>` : '<small>Sem e-mail</small>'}</div><div data-label="Endereço"><span>${esc(customer.address || 'Não informado')}</span></div><div data-label="Relacionamento"><em class="consent-badge ${customer.marketingConsent ? 'allowed' : ''}">${customer.marketingConsent ? '✓ Aceitou ofertas' : 'Sem autorização'}</em></div><div data-label="Último pedido"><b>${esc(formatCustomerDate(customer.lastOrder))}</b><small>Cliente desde ${esc(formatCustomerDate(customer.firstOrder))}</small></div><div data-label="Evento" class="customer-event-cell">${customerConversionAction(customer)}</div></article>`;
     }).join('') : '<div class="empty-admin">Nenhum cliente encontrado com estes filtros.</div>';
   }
 
@@ -1488,9 +1558,13 @@
 
   async function refreshOrders(showConfirmation = true) {
     try {
-      const nextOrders = await SupabaseStore.listOrders();
+      const [nextOrders, nextConversionEvents] = await Promise.all([
+        SupabaseStore.listOrders(),
+        SupabaseStore.listConversionEvents()
+      ]);
       const newOrders = nextOrders.filter(order => !knownOrderIds.has(String(order.id)));
       orders = nextOrders;
+      conversionEvents = nextConversionEvents;
       knownOrderIds = new Set(orders.map(order => String(order.id)));
       renderDashboard();
       renderOrders();
@@ -1540,6 +1614,10 @@
     $('#refresh-orders').onclick = () => refreshOrders(true);
     $('#customer-search').oninput = event => { customerQuery = event.target.value.trim(); renderCustomers(); };
     $('#customer-consent-filter').onchange = event => { customerConsentFilter = event.target.value; renderCustomers(); };
+    $('#customers-list').onclick = event => {
+      const button = event.target.closest('[data-send-conversion]');
+      if (button) sendCustomerConversion(button.dataset.sendConversion);
+    };
     $('#export-customers').onclick = exportCustomers;
     $('#dashboard-period').onchange = event => {
       dashboardPeriod = event.target.value;

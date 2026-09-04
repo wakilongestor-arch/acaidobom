@@ -27,7 +27,7 @@ function validGaSessionId(value: unknown) {
   return /^\d{8,}$/.test(sessionId) ? sessionId : '';
 }
 
-async function sendGa4(db: any, order: any) {
+async function sendGa4(db: any, order: any, forceRetry = false) {
   if (order.customer?.trackingConsent?.analytics !== true) {
     return { sent: false, skipped: true, reason: 'analytics_consent_required' };
   }
@@ -43,7 +43,7 @@ async function sendGa4(db: any, order: any) {
   const { data: previous } = await db.from('order_webhook_events')
     .select('id,status').eq('order_id', order.id).eq('event_type', eventType)
     .eq('source_updated_at', order.created_at).maybeSingle();
-  if (previous?.status === 'enviado') return { sent: true, duplicate: true };
+  if (previous?.status === 'enviado' && !forceRetry) return { sent: true, duplicate: true };
 
   let auditId = previous?.id || crypto.randomUUID();
   if (previous?.id) {
@@ -104,11 +104,16 @@ Deno.serve(async req => {
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405);
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-  const { orderId, eventId, sourceUrl } = await req.json().catch(() => ({}));
+  const { orderId, eventId, sourceUrl, forceRetry = false } = await req.json().catch(() => ({}));
   if (!supabaseUrl || !serviceKey) return json({ error: 'Supabase incompleto.' }, 503);
   if (!orderId || !eventId) return json({ error: 'Pedido inválido.' }, 400);
 
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  if (forceRetry) {
+    const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    const { data: authData, error: authError } = await db.auth.getUser(token);
+    if (authError || !authData.user) return json({ error: 'Apenas o administrador pode reenviar conversões.' }, 401);
+  }
   const { data: order, error } = await db.from('orders').select('*').eq('id', String(orderId)).eq('order_number', String(eventId)).maybeSingle();
   if (error || !order) return json({ error: 'Pedido não encontrado.' }, 404);
   if (!['confirmado', 'preparando', 'saiu_entrega', 'concluido'].includes(order.status)) {
@@ -120,12 +125,13 @@ Deno.serve(async req => {
     method: 'POST', headers,
     body: JSON.stringify({
       orderId: order.id, eventId: order.order_number, confirmedBy: 'crm_confirmation',
-      sourceUrl: sourceUrl || 'https://acaidobom.com.br/', fbp: order.customer?.fbp || '', fbc: order.customer?.fbc || ''
+      forceRetry: Boolean(forceRetry), sourceUrl: sourceUrl || 'https://acaidobom.com.br/',
+      fbp: order.customer?.fbp || '', fbc: order.customer?.fbc || ''
     })
   });
   const [meta, ga4] = await Promise.all([
     metaResponse.json().catch(() => ({ sent: false, status: metaResponse.status })),
-    sendGa4(db, order)
+    sendGa4(db, order, Boolean(forceRetry))
   ]);
   return json({ sent: Boolean((meta as any)?.sent || (ga4 as any)?.sent), confirmed: true, meta, ga4 });
 });
