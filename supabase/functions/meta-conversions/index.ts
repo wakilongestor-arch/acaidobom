@@ -95,9 +95,18 @@ Deno.serve(async req => {
   const body = await req.json().catch(() => ({}));
   const orderId = String(body.orderId || '');
   const eventId = String(body.eventId || '');
+  const forceRetry = body.forceRetry === true;
   if (!orderId || !eventId) return json({ error: 'orderId e eventId são obrigatórios.' }, 400);
 
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  if (forceRetry) {
+    const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    const internalService = token === serviceKey;
+    if (!internalService) {
+      const { data: authData, error: authError } = await db.auth.getUser(token);
+      if (authError || !authData.user) return json({ error: 'Apenas o administrador pode reenviar conversões.' }, 401);
+    }
+  }
   const { data: order, error: orderError } = await db.from('orders').select('*').eq('id', orderId).single();
   if (orderError || !order) return json({ error: 'Pedido não encontrado.' }, 404);
   if (eventId !== order.order_number) return json({ error: 'Identificação do evento inválida.' }, 400);
@@ -125,7 +134,7 @@ Deno.serve(async req => {
     .eq('source_updated_at', order.created_at)
     .maybeSingle();
 
-  if (previous?.status === 'enviado') {
+  if (previous?.status === 'enviado' && !forceRetry) {
     return json({ sent: true, configured: true, duplicate: true, eventId });
   }
 
